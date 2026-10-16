@@ -408,7 +408,7 @@ contains
       do i = 1, len(trim(var_address))
         c_names(start + i - 1) = var_address(i:i)
       end do
-      c_names(start + i) = c_null_char
+      c_names(start + i - 1) = c_null_char
       start = start + BMI_LENVARADDRESS
     end do
     bmi_status = BMI_SUCCESS
