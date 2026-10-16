@@ -478,7 +478,7 @@ contains
   !<
   subroutine sfr_allocate_arrays(this)
     ! -- modules
-    use MemoryManagerModule, only: mem_allocate, mem_setptr
+    use MemoryManagerModule, only: mem_allocate, mem_setptr, mem_set_transient
     ! -- dummy
     class(SfrType), intent(inout) :: this !< SfrType object
     ! -- local
@@ -584,6 +584,10 @@ contains
                       this%memoryPath)
     call mem_allocate(this%xsrough, this%ncrossptstot, 'XSROUGH', &
                       this%memoryPath)
+    ! reallocated when period data change the cross sections
+    call mem_set_transient('STATION', this%memoryPath)
+    call mem_set_transient('XSHEIGHT', this%memoryPath)
+    call mem_set_transient('XSROUGH', this%memoryPath)
     !
     ! -- initialize variables
     this%iacross(1) = 0

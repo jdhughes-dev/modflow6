@@ -10,10 +10,12 @@ module mf6bmiExtension
   use KindModule, only: I4B
   use mf6bmiError
   use mf6bmiUtil
+  use mf6bmi
   use mf6xmi
   implicit none
 
   integer(c_int), parameter :: XMI_TABLE_VERSION = 1 !< version of XmiTableType
+  integer(c_int), parameter :: POINTERS_TABLE_VERSION = 1 !< version of PointersTableType
 
   !> @brief Function table for the 'xmi' extension
   !<
@@ -31,7 +33,21 @@ module mf6bmiExtension
     type(c_funptr) :: get_var_address
   end type XmiTableType
 
+  !> @brief Function table for the 'bmi:pointers' extension
+  !<
+  type, bind(C) :: PointersTableType
+    integer(c_int) :: version !< table version
+    integer(c_int) :: nfunctions !< number of function pointers that follow
+    type(c_funptr) :: get_value_ptr
+    type(c_funptr) :: get_value_ptr_double
+    type(c_funptr) :: get_value_ptr_int
+    type(c_funptr) :: get_value_ptr_bool
+    type(c_funptr) :: get_var_rank
+    type(c_funptr) :: get_var_shape
+  end type PointersTableType
+
   type(XmiTableType), target, save :: xmi_table !< the 'xmi' function table
+  type(PointersTableType), target, save :: pointers_table !< the 'bmi:pointers' function table
 
 contains
 
@@ -62,6 +78,12 @@ contains
         c_table = c_loc(xmi_table)
         bmi_status = BMI_SUCCESS
       end if
+    case (EXT_POINTERS)
+      if (pointers_enabled) then
+        call fill_pointers_table()
+        c_table = c_loc(pointers_table)
+        bmi_status = BMI_SUCCESS
+      end if
     end select
 
     if (bmi_status /= BMI_SUCCESS) then
@@ -86,5 +108,18 @@ contains
     xmi_table%get_version = c_funloc(xmi_get_version)
     xmi_table%get_var_address = c_funloc(get_var_address)
   end subroutine fill_xmi_table
+
+  !> @brief Fill the 'bmi:pointers' function table
+  !<
+  subroutine fill_pointers_table()
+    pointers_table%version = POINTERS_TABLE_VERSION
+    pointers_table%nfunctions = 6
+    pointers_table%get_value_ptr = c_funloc(get_value_ptr)
+    pointers_table%get_value_ptr_double = c_funloc(get_value_ptr_double)
+    pointers_table%get_value_ptr_int = c_funloc(get_value_ptr_int)
+    pointers_table%get_value_ptr_bool = c_funloc(get_value_ptr_bool)
+    pointers_table%get_var_rank = c_funloc(get_var_rank)
+    pointers_table%get_var_shape = c_funloc(get_var_shape)
+  end subroutine fill_pointers_table
 
 end module mf6bmiExtension

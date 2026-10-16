@@ -6,7 +6,8 @@ module TspExchangeMoverModule
   use VirtualModelModule, only: VirtualModelType, get_virtual_model
   use TspFmiModule, only: TspFmiType
   use TransportModelModule, only: TransportModelType
-  use MemoryManagerModule, only: mem_allocate, mem_deallocate, mem_reallocate
+  use MemoryManagerModule, only: mem_allocate, mem_deallocate, mem_reallocate, &
+                                 mem_set_transient
   use SimVariablesModule, only: proc_id
   implicit none
   private
@@ -67,6 +68,9 @@ contains
 
     call mem_allocate(mvt%quantity_m1, 0, "QUANTITY_M1", mvt%memoryPath)
     call mem_allocate(mvt%quantity_m2, 0, "QUANTITY_M2", mvt%memoryPath)
+    ! sized on the first time step
+    call mem_set_transient("QUANTITY_M1", mvt%memoryPath)
+    call mem_set_transient("QUANTITY_M2", mvt%memoryPath)
     call mem_allocate(mvt%maxmvt, "MAXMVT", mvt%memoryPath)
     mvt%maxmvt = 0
 

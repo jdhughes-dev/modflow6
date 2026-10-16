@@ -27,7 +27,7 @@ module mf6bmi
   use CharacterStringModule
   use MemoryManagerModule, only: mem_setptr, get_mem_elem_size, get_isize, &
                                  get_mem_rank, get_mem_shape, get_mem_type, &
-                                 memorystore
+                                 memorystore, mem_freeze_stable
   use MemoryContainerIteratorModule, only: MemoryContainerIteratorType
   use MemoryTypeModule, only: MemoryType
   use MemoryHelperModule, only: create_mem_address
@@ -119,6 +119,11 @@ contains
     ! -- initialize MODFLOW 6
     call Mf6Initialize()
 
+    ! -- from here on, pointers to stable variables must stay valid
+    if (pointers_enabled) then
+      call mem_freeze_stable(.true.)
+    end if
+
     bmi_status = BMI_SUCCESS
 
   end function bmi_initialize
@@ -199,8 +204,10 @@ contains
 
     ! we don't want a full stop() here, this disables it:
     iforcestop = 0
+    call mem_freeze_stable(.false.)
     call Mf6Finalize()
     xmi_enabled = .false.
+    pointers_enabled = .false.
 
     bmi_status = BMI_SUCCESS
 
@@ -318,7 +325,9 @@ contains
   !> @brief Get the number of variables in a variable set
   !!
   !! The sets 'input' and 'output' both hold every variable in the memory
-  !! manager.
+  !! manager. With 'bmi:pointers', 'bmi:pointers:stable' holds the variables
+  !! whose storage does not move from initialize to finalize and
+  !! 'bmi:pointers:transient' the rest.
   !<
   function get_varset_member_count(c_set_name, count) result(bmi_status) &
     bind(C, name="get_varset_member_count")
@@ -329,19 +338,27 @@ contains
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
     character(len=:), allocatable :: set_name
+    type(MemoryContainerIteratorType), allocatable :: itr
+    type(MemoryType), pointer :: mt => null()
 
     set_name = char_array_to_string(c_set_name, &
                                     strlen(c_set_name, BMI_LENSETNAME))
-    select case (set_name)
-    case ('input', 'output')
-      count = memorystore%count()
-      bmi_status = BMI_SUCCESS
-    case default
+    if (.not. is_varset(set_name)) then
       count = -1
       write (bmi_last_error, fmt_unknown_varset) trim(set_name)
       call report_bmi_error(bmi_last_error)
       bmi_status = BMI_FAILURE
-    end select
+      return
+    end if
+
+    count = 0
+    itr = memorystore%iterator()
+    do while (itr%has_next())
+      call itr%next()
+      mt => itr%value()
+      if (in_varset(set_name, mt)) count = count + 1
+    end do
+    bmi_status = BMI_SUCCESS
 
   end function get_varset_member_count
 
@@ -372,28 +389,65 @@ contains
 
     set_name = char_array_to_string(c_set_name, &
                                     strlen(c_set_name, BMI_LENSETNAME))
-    select case (set_name)
-    case ('input', 'output')
-      start = 1
-      itr = memorystore%iterator()
-      do while (itr%has_next())
-        call itr%next()
-        mt => itr%value()
-        var_address = create_mem_address(mt%path, mt%name)
-        do i = 1, len(trim(var_address))
-          c_names(start + i - 1) = var_address(i:i)
-        end do
-        c_names(start + i) = c_null_char
-        start = start + BMI_LENVARADDRESS
-      end do
-      bmi_status = BMI_SUCCESS
-    case default
+    if (.not. is_varset(set_name)) then
       write (bmi_last_error, fmt_unknown_varset) trim(set_name)
       call report_bmi_error(bmi_last_error)
       bmi_status = BMI_FAILURE
-    end select
+      return
+    end if
+
+    start = 1
+    itr = memorystore%iterator()
+    do while (itr%has_next())
+      call itr%next()
+      mt => itr%value()
+      if (.not. in_varset(set_name, mt)) cycle
+      var_address = create_mem_address(mt%path, mt%name)
+      do i = 1, len(trim(var_address))
+        c_names(start + i - 1) = var_address(i:i)
+      end do
+      c_names(start + i) = c_null_char
+      start = start + BMI_LENVARADDRESS
+    end do
+    bmi_status = BMI_SUCCESS
 
   end function get_varset_members
+
+  !> @brief Return true if the variable set is known
+  !!
+  !! The 'bmi:pointers' sets are known only when that extension was
+  !! negotiated at initialize.
+  !<
+  function is_varset(set_name) result(known)
+    character(len=*), intent(in) :: set_name !< name of the variable set
+    logical(LGP) :: known !< true if known
+
+    select case (set_name)
+    case ('input', 'output')
+      known = .true.
+    case ('bmi:pointers:stable', 'bmi:pointers:transient')
+      known = pointers_enabled
+    case default
+      known = .false.
+    end select
+  end function is_varset
+
+  !> @brief Return true if the variable is a member of the set
+  !<
+  function in_varset(set_name, mt) result(member)
+    character(len=*), intent(in) :: set_name !< name of a known variable set
+    type(MemoryType), pointer, intent(in) :: mt !< the variable
+    logical(LGP) :: member !< true if a member
+
+    select case (set_name)
+    case ('bmi:pointers:stable')
+      member = .not. mt%transient
+    case ('bmi:pointers:transient')
+      member = mt%transient
+    case default
+      member = .true.
+    end select
+  end function in_varset
 
   !> @brief Get the size (in bytes) of a single element of a variable
   !<
@@ -790,8 +844,7 @@ contains
   !! its shape.
   !<
   function get_value_ptr(c_var_address, c_arr_ptr) result(bmi_status) &
-    bind(C, name="get_value_ptr")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_value_ptr
+    bind(C, name="")
     ! -- modules
     use ConstantsModule, only: LENMEMTYPE
     ! -- dummy variables
@@ -837,8 +890,7 @@ contains
   !! its shape.
   !<
   function get_value_ptr_double(c_var_address, c_arr_ptr) result(bmi_status) &
-    bind(C, name="get_value_ptr_double")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_value_ptr_double
+    bind(C, name="")
     ! -- dummy variables
     character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
     type(c_ptr), intent(inout) :: c_arr_ptr !< pointer to the array
@@ -891,8 +943,7 @@ contains
   !! can be used to get the variable's dimensionality.
   !<
   function get_value_ptr_int(c_var_address, c_arr_ptr) result(bmi_status) &
-    bind(C, name="get_value_ptr_int")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_value_ptr_int
+    bind(C, name="")
     ! -- dummy variables
     character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
     type(c_ptr), intent(inout) :: c_arr_ptr !< pointer to the array
@@ -944,8 +995,7 @@ contains
   !! Only scalar values (with rank=0) are supported.
   !<
   function get_value_ptr_bool(c_var_address, c_arr_ptr) result(bmi_status) &
-    bind(C, name="get_value_ptr_bool")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_value_ptr_bool
+    bind(C, name="")
     ! -- dummy variables
     character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
     type(c_ptr), intent(inout) :: c_arr_ptr !< pointer to the array
@@ -1497,8 +1547,7 @@ contains
   !! access to the rank of the array.
   !<
   function get_var_rank(c_var_address, c_var_rank) result(bmi_status) &
-    bind(C, name="get_var_rank")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_var_rank
+    bind(C, name="")
     ! -- dummy variables
     character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
     integer(kind=c_int), intent(out) :: c_var_rank !< variable rank
@@ -1535,8 +1584,7 @@ contains
   !! to C-style.
   !<
   function get_var_shape(c_var_address, c_var_shape) result(bmi_status) &
-    bind(C, name="get_var_shape")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_var_shape
+    bind(C, name="")
     ! -- modules
     use ConstantsModule, only: MAXMEMRANK
     ! -- dummy variables

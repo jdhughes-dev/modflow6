@@ -6,6 +6,7 @@ program bmitester
     & run_selected, get_argument
   use TestBmiCore, only: collect_bmicore
   use TestBmiXmi, only: collect_bmixmi
+  use TestBmiPointers, only: collect_bmipointers
   implicit none
   integer :: stat, is
   character(len=:), allocatable :: suite_name, test_name
@@ -15,7 +16,8 @@ program bmitester
   stat = 0
   testsuites = [ &
                new_testsuite("BmiCore", collect_bmicore), &
-               new_testsuite("BmiXmi", collect_bmixmi) &
+               new_testsuite("BmiXmi", collect_bmixmi), &
+               new_testsuite("BmiPointers", collect_bmipointers) &
                ]
 
   call get_argument(1, suite_name)
