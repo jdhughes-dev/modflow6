@@ -9,8 +9,8 @@ module mf6bmiError
   use ConstantsModule, only: MAXCHARLEN
   use SimVariablesModule, only: istdout
 
-  integer, parameter :: BMI_FAILURE = 1 !< BMI status code for failure (taken from bmi.f90, CSDMS)
-  integer, parameter :: BMI_SUCCESS = 0 !< BMI status code for success (taken from bmi.f90, CSDMS)
+  integer, parameter :: BMI_FAILURE = 1 !< BMI status code for failure
+  integer, parameter :: BMI_SUCCESS = 0 !< BMI status code for success
 
   integer(I4B), parameter :: LENERRMESSAGE = 1024 !< max length for the error message
   integer(c_int), bind(C, name="BMI_LENERRMESSAGE") :: BMI_LENERRMESSAGE = &

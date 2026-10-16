@@ -55,6 +55,23 @@ contains
 
   end function bmi_get_component_name
 
+  !> @brief Get the version of the BMI specification implemented
+  !<
+  function bmi_get_bmi_version(bmi_version) result(bmi_status) &
+    bind(C, name="get_bmi_version")
+    !DIR$ ATTRIBUTES DLLEXPORT :: bmi_get_bmi_version
+    ! -- dummy variables
+    character(kind=c_char), intent(inout) :: bmi_version(BMI_LENVERSION) !< BMI version, e.g. '3.0'
+    integer(kind=c_int) :: bmi_status !< BMI status code
+    ! -- local variables
+    character(len=*), parameter :: version = '3.0'
+
+    bmi_version(1:len(version) + 1) = &
+      string_to_char_array(version, len(version))
+    bmi_status = BMI_SUCCESS
+
+  end function bmi_get_bmi_version
+
   !> @brief Initialize the computational core
   !!
   !! It is required to have the MODFLOW 6 configuration file 'mfsim.nam'

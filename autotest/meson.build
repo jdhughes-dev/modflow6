@@ -50,4 +50,35 @@ if test_drive.found() and not fc_id.contains('intel')
   foreach t : tests
     test(t, tester, args: t)
   endforeach
+
+  # the BMI keeps the simulation in global state, so each BMI test runs in
+  # its own process, one at a time, in the minimal simulation
+  bmi_tests = {
+    'Bmi': ['bmi_version', 'component_name', 'lifecycle'],
+  }
+
+  bmi_test_srcs = files('bmitester.f90')
+  foreach suite, names : bmi_tests
+    bmi_test_srcs += files('Test@0@.f90'.format(suite))
+  endforeach
+
+  bmitester = executable(
+    'bmitester',
+    sources: bmi_test_srcs + bmi_sources,
+    link_with: mf6core,
+    dependencies: [test_drive] + dependencies + extra_deps,
+  )
+
+  bmi_testdir = meson.project_source_root() / '.mf6minsim'
+  foreach suite, names : bmi_tests
+    foreach name : names
+      test(
+        '@0@:@1@'.format(suite, name),
+        bmitester,
+        args: [suite, name],
+        workdir: bmi_testdir,
+        is_parallel: false,
+      )
+    endforeach
+  endforeach
 endif
