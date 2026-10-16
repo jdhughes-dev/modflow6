@@ -69,7 +69,14 @@ if test_drive.found() and not fc_id.contains('intel')
   # the BMI keeps the simulation in global state, so each BMI test runs in
   # its own process, one at a time, in the minimal simulation
   bmi_tests = {
-    'BmiCore': ['bmi_version', 'component_name', 'lifecycle'],
+    'BmiCore': [
+      'bmi_version',
+      'component_name',
+      'lifecycle',
+      'varset_count',
+      'varset_members',
+      'varset_unknown',
+    ],
   }
 
   bmi_test_srcs = files('bmitester.f90')
