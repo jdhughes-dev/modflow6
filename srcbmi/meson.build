@@ -1,5 +1,4 @@
 bmi_sources = files(
-    'bmi.f90',
     'mf6bmi.f90',
     'mf6bmiError.f90',
     'mf6bmiGrid.f90',
