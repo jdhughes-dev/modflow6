@@ -5,6 +5,7 @@ program bmitester
   use testdrive, only: new_testsuite, testsuite_type, select_suite, &
     & run_selected, get_argument
   use TestBmi, only: collect_bmi
+  use TestBmiXmi, only: collect_bmixmi
   implicit none
   integer :: stat, is
   character(len=:), allocatable :: suite_name, test_name
@@ -13,7 +14,8 @@ program bmitester
 
   stat = 0
   testsuites = [ &
-               new_testsuite("Bmi", collect_bmi) &
+               new_testsuite("Bmi", collect_bmi), &
+               new_testsuite("BmiXmi", collect_bmixmi) &
                ]
 
   call get_argument(1, suite_name)

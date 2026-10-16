@@ -25,6 +25,9 @@ module mf6bmiError
                                  "('BMI Error, unknown variable: ', a, ' at ', a)"
   character(len=*), parameter :: fmt_unknown_varset = & !< Variable set unknown, args: set name
                                  "('BMI Error, unknown variable set: ', a)"
+  character(len=*), parameter :: fmt_unavailable_ext = & !< Extension not negotiated, args: extension name
+                                 "('BMI Error, extension not supported or &
+                                 &not requested at initialize: ', a)"
   character(len=*), parameter :: fmt_invalid_var = & !< Invalid variable address, args: variable address
                                  "('BMI Error, invalid address string: ', a)"
   character(len=*), parameter :: fmt_unsupported_rank = & !< Unsupported rank, args: variable name

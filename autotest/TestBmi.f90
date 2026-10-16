@@ -4,10 +4,11 @@
 !<
 module TestBmi
   use testdrive, only: error_type, unittest_type, new_unittest, check
-  use iso_c_binding, only: c_char, c_double, c_int, c_null_char
+  use iso_c_binding, only: c_char, c_double, c_int
   use mf6bmiError, only: BMI_SUCCESS, BMI_FAILURE
   use mf6bmiUtil, only: BMI_LENVERSION, BMI_LENCOMPONENTNAME, &
-                        BMI_LENVARADDRESS, strlen, char_array_to_string
+                        BMI_LENVARADDRESS, BMI_LENEXTENSIONNAME
+  use BmiTestUtils, only: to_string, to_c, has_member, init
   use mf6bmi, only: bmi_get_bmi_version, bmi_get_component_name, &
                     bmi_initialize, bmi_update, bmi_finalize, &
                     get_current_time, get_end_time, &
@@ -25,21 +26,12 @@ contains
                 new_unittest("bmi_version", test_bmi_version), &
                 new_unittest("component_name", test_component_name), &
                 new_unittest("lifecycle", test_lifecycle), &
+                new_unittest("config_file", test_config_file), &
                 new_unittest("varset_count", test_varset_count), &
                 new_unittest("varset_members", test_varset_members), &
                 new_unittest("varset_unknown", test_varset_unknown) &
                 ]
   end subroutine collect_bmi
-
-  !> @brief Convert a null-terminated C string to a Fortran string
-  !<
-  function to_string(c_string, max_len) result(f_string)
-    integer, intent(in) :: max_len
-    character(kind=c_char), intent(in) :: c_string(max_len)
-    character(len=:), allocatable :: f_string
-
-    f_string = char_array_to_string(c_string, strlen(c_string, max_len))
-  end function to_string
 
   subroutine test_bmi_version(error)
     type(error_type), allocatable, intent(out) :: error
@@ -64,7 +56,7 @@ contains
     type(error_type), allocatable, intent(out) :: error
     real(c_double) :: current_time, end_time
 
-    call check(error, bmi_initialize() == BMI_SUCCESS)
+    call check(error, init() == BMI_SUCCESS)
     if (allocated(error)) return
 
     call check(error, get_end_time(end_time) == BMI_SUCCESS)
@@ -79,44 +71,26 @@ contains
     call check(error, bmi_finalize() == BMI_SUCCESS)
   end subroutine test_lifecycle
 
-  !> @brief Convert a Fortran string to a null-terminated C string
-  !<
-  function to_c(f_string) result(c_string)
-    character(len=*), intent(in) :: f_string
-    character(kind=c_char) :: c_string(len(f_string) + 1)
-    integer :: i
+  subroutine test_config_file(error)
+    type(error_type), allocatable, intent(out) :: error
+    character(kind=c_char) :: c_requested(BMI_LENEXTENSIONNAME)
+    character(kind=c_char) :: c_supported(BMI_LENEXTENSIONNAME)
+    integer(c_int) :: n_supported
 
-    do i = 1, len(f_string)
-      c_string(i) = f_string(i:i)
-    end do
-    c_string(len(f_string) + 1) = c_null_char
-  end function to_c
+    call check(error, &
+               bmi_initialize(to_c('mfsim.nam'), 0, c_requested, &
+                              n_supported, c_supported) == BMI_SUCCESS)
+    if (allocated(error)) return
+    call check(error, n_supported == 0)
 
-  !> @brief Return true if the flat name buffer holds the address
-  !<
-  function has_member(c_names, count, address) result(found)
-    character(kind=c_char), intent(in) :: c_names(:)
-    integer, intent(in) :: count
-    character(len=*), intent(in) :: address
-    logical :: found
-    integer :: i, start
-
-    found = .false.
-    do i = 1, count
-      start = (i - 1) * BMI_LENVARADDRESS + 1
-      if (to_string(c_names(start:start + BMI_LENVARADDRESS - 1), &
-                    BMI_LENVARADDRESS) == address) then
-        found = .true.
-        exit
-      end if
-    end do
-  end function has_member
+    call check(error, bmi_finalize() == BMI_SUCCESS)
+  end subroutine test_config_file
 
   subroutine test_varset_count(error)
     type(error_type), allocatable, intent(out) :: error
     integer(c_int) :: n_input, n_output
 
-    call check(error, bmi_initialize() == BMI_SUCCESS)
+    call check(error, init() == BMI_SUCCESS)
     if (allocated(error)) return
 
     call check(error, &
@@ -135,7 +109,7 @@ contains
     character(kind=c_char), allocatable :: c_names(:)
     integer(c_int) :: count
 
-    call check(error, bmi_initialize() == BMI_SUCCESS)
+    call check(error, init() == BMI_SUCCESS)
     if (allocated(error)) return
 
     call check(error, &
@@ -157,7 +131,7 @@ contains
     character(kind=c_char) :: c_names(BMI_LENVARADDRESS)
     integer(c_int) :: count
 
-    call check(error, bmi_initialize() == BMI_SUCCESS)
+    call check(error, init() == BMI_SUCCESS)
     if (allocated(error)) return
 
     call check(error, &
