@@ -50,7 +50,9 @@ module mf6bmiUtil
   !DIR$ ATTRIBUTES DLLEXPORT :: BMI_LENEXTENSIONNAME
 
   character(len=*), parameter :: EXT_XMI = 'xmi' !< name of the XMI extension
+  character(len=*), parameter :: EXT_POINTERS = 'bmi:pointers' !< name of the pointers extension
   logical(LGP) :: xmi_enabled = .false. !< true when xmi was negotiated at initialize
+  logical(LGP) :: pointers_enabled = .false. !< true when bmi:pointers was negotiated at initialize
 
 contains
 
@@ -71,6 +73,7 @@ contains
     integer(I4B) :: i, istart, iend
 
     xmi_enabled = .false.
+    pointers_enabled = .false.
     n_supported = 0
     do i = 1, n_requested
       istart = (i - 1) * BMI_LENEXTENSIONNAME + 1
@@ -84,6 +87,11 @@ contains
         if (.not. xmi_enabled) then
           xmi_enabled = .true.
           call add_name(EXT_XMI)
+        end if
+      case (EXT_POINTERS)
+        if (.not. pointers_enabled) then
+          pointers_enabled = .true.
+          call add_name(EXT_POINTERS)
         end if
       end select
     end do

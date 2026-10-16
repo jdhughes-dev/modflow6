@@ -70,7 +70,21 @@ if test_drive.found() and not fc_id.contains('intel')
       'table',
       'time_loop',
     ],
+    'BmiPointers': [
+      'negotiate',
+      'not_requested',
+      'table',
+      'value_ptr',
+      'stable_across_run',
+      'varsets',
+      'realloc_stable',
+      'realloc_transient',
+      'realloc_not_requested',
+    ],
   }
+
+  # tests that pass when the memory manager terminates the run
+  bmi_failing_tests = ['BmiPointers:realloc_stable']
 
   bmi_test_srcs = files('bmitester.f90', 'BmiTestUtils.f90')
   foreach suite, names : bmi_tests
@@ -87,12 +101,14 @@ if test_drive.found() and not fc_id.contains('intel')
   bmi_testdir = meson.project_source_root() / '.mf6minsim'
   foreach suite, names : bmi_tests
     foreach name : names
+      test_name = '@0@:@1@'.format(suite, name)
       test(
-        '@0@:@1@'.format(suite, name),
+        test_name,
         bmitester,
         args: [suite, name],
         workdir: bmi_testdir,
         is_parallel: false,
+        should_fail: test_name in bmi_failing_tests,
       )
     endforeach
   endforeach

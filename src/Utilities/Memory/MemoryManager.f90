@@ -24,6 +24,8 @@ module MemoryManagerModule
   public :: mem_allocate
   public :: mem_checkin
   public :: mem_reallocate
+  public :: mem_set_transient
+  public :: mem_freeze_stable
   public :: mem_setptr
   public :: mem_copyptr
   public :: mem_reassignptr
@@ -78,6 +80,8 @@ module MemoryManagerModule
       checkin_dbl2d, &
       checkin_charstr1d
   end interface mem_checkin
+
+  logical(LGP) :: freeze_stable = .false. !< when true, only transient variables may be reallocated
 
   interface mem_reallocate
     module procedure &
@@ -1256,6 +1260,7 @@ contains
       mt%astr1d => astr
       mt%element_size = ilen
       mt%isize = isize
+      call check_stable(mt)
       mt%nrealloc = mt%nrealloc + 1
       mt%master = .true.
       nvalues_astr = nvalues_astr + isize - isize_old
@@ -1350,6 +1355,7 @@ contains
       mt%acharstr1d => acharstr1d
       mt%element_size = ilen
       mt%isize = isize
+      call check_stable(mt)
       mt%nrealloc = mt%nrealloc + 1
       mt%master = .true.
       nvalues_astr = nvalues_astr + isize - isize_old
@@ -1399,6 +1405,7 @@ contains
     mt%alogical1d => alog
     mt%element_size = LGP
     mt%isize = isize
+    call check_stable(mt)
     mt%nrealloc = mt%nrealloc + 1
     mt%master = .true.
     nvalues_alogical = nvalues_alogical + isize - isizeold
@@ -1441,6 +1448,7 @@ contains
     mt%aint1d => aint
     mt%element_size = I4B
     mt%isize = isize
+    call check_stable(mt)
     mt%nrealloc = mt%nrealloc + 1
     mt%master = .true.
     nvalues_aint = nvalues_aint + isize - isizeold
@@ -1488,6 +1496,7 @@ contains
     mt%aint2d => aint
     mt%element_size = I4B
     mt%isize = isize
+    call check_stable(mt)
     mt%nrealloc = mt%nrealloc + 1
     mt%master = .true.
     nvalues_aint = nvalues_aint + isize - isizeold
@@ -1531,11 +1540,44 @@ contains
     mt%adbl1d => adbl
     mt%element_size = DP
     mt%isize = isize
+    call check_stable(mt)
     mt%nrealloc = mt%nrealloc + 1
     mt%master = .true.
     nvalues_adbl = nvalues_adbl + isize - isizeold
     write (mt%memtype, "(a,' (',i0,')')") 'DOUBLE', isize
   end subroutine reallocate_dbl1d
+
+  !> @brief Mark a variable whose storage may move after initialize
+  !<
+  subroutine mem_set_transient(name, mem_path)
+    character(len=*), intent(in) :: name !< variable name
+    character(len=*), intent(in) :: mem_path !< path where variable is stored
+    ! -- local
+    type(MemoryType), pointer :: mt
+    logical(LGP) :: found
+    ! -- code
+    call get_from_memorystore(name, mem_path, mt, found)
+    mt%transient = .true.
+  end subroutine mem_set_transient
+
+  !> @brief Make reallocating a variable not marked transient an error
+  !<
+  subroutine mem_freeze_stable(freeze)
+    logical(LGP), intent(in) :: freeze !< true after initialize, false at finalize
+    freeze_stable = freeze
+  end subroutine mem_freeze_stable
+
+  !> @brief Terminate if a stable variable is reallocated while frozen
+  !<
+  subroutine check_stable(mt)
+    type(MemoryType), pointer, intent(in) :: mt !< variable being reallocated
+    if (freeze_stable .and. .not. mt%transient) then
+      write (errmsg, '(5a)') 'Variable ', trim(mt%name), ' at ', &
+        trim(mt%path), ' is a stable BMI pointer but was reallocated &
+        &after initialize.'
+      call store_error(errmsg, terminate=.true.)
+    end if
+  end subroutine check_stable
 
   !> @brief Reallocate a 2-dimensional real array
   !<
@@ -1579,6 +1621,7 @@ contains
     mt%adbl2d => adbl
     mt%element_size = DP
     mt%isize = isize
+    call check_stable(mt)
     mt%nrealloc = mt%nrealloc + 1
     mt%master = .true.
     nvalues_adbl = nvalues_adbl + isize - isizeold

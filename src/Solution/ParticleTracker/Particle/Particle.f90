@@ -6,7 +6,7 @@ module ParticleModule
   use ConstantsModule, only: DZERO, DONE, LENMEMPATH, LENBOUNDNAME, &
                              LINELENGTH
   use MemoryManagerModule, only: mem_allocate, mem_deallocate, &
-                                 mem_reallocate
+                                 mem_reallocate, mem_set_transient
   use ErrorUtilModule, only: pstop
   implicit none
   public
@@ -186,6 +186,31 @@ contains
     call mem_allocate(store%icycwin, np, 'PLICYCWIN', mempath)
     call mem_allocate(store%itrdomain, np, MAX_LEVEL, 'PLIDOMAIN', mempath)
     call mem_allocate(store%iboundary, np, MAX_LEVEL, 'PLIBOUNDARY', mempath)
+    ! resized as particles are released
+    call mem_set_transient('PLIMDL', mempath)
+    call mem_set_transient('PLIRPT', mempath)
+    call mem_set_transient('PLIPRP', mempath)
+    call mem_set_transient('PLNAME', mempath)
+    call mem_set_transient('PLICU', mempath)
+    call mem_set_transient('PLILAY', mempath)
+    call mem_set_transient('PLIZONE', mempath)
+    call mem_set_transient('PLISTATUS', mempath)
+    call mem_set_transient('PLX', mempath)
+    call mem_set_transient('PLY', mempath)
+    call mem_set_transient('PLZ', mempath)
+    call mem_set_transient('PLTRELEASE', mempath)
+    call mem_set_transient('PLTSTOP', mempath)
+    call mem_set_transient('PLTTRACK', mempath)
+    call mem_set_transient('PLISTOPWEAKSINK', mempath)
+    call mem_set_transient('PLISTOPZONE', mempath)
+    call mem_set_transient('PLIDRYMETH', mempath)
+    call mem_set_transient('PLFRCTRN', mempath)
+    call mem_set_transient('PLIEXMETH', mempath)
+    call mem_set_transient('PLEXTOL', mempath)
+    call mem_set_transient('PLEXTEND', mempath)
+    call mem_set_transient('PLICYCWIN', mempath)
+    call mem_set_transient('PLIDOMAIN', mempath)
+    call mem_set_transient('PLIBOUNDARY', mempath)
   end subroutine create_particle_store
 
   !> @brief Destroy particle store after use.

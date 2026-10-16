@@ -11,7 +11,8 @@ module PackageBudgetModule
   use KindModule
   use ConstantsModule, only: LENPACKAGENAME, LENAUXNAME, LENMEMPATH
   use MemoryManagerModule, only: mem_allocate, mem_reassignptr, &
-                                 mem_reallocate, mem_deallocate
+                                 mem_reallocate, mem_deallocate, &
+                                 mem_set_transient
 
   implicit none
 
@@ -70,6 +71,10 @@ contains
     call mem_allocate(this%nodelist, 0, 'NODELIST', mempath)
     call mem_allocate(this%flow, 0, 'FLOW', mempath)
     call mem_allocate(this%auxvar, 0, 0, 'AUXVAR', mempath)
+    ! grown by copy_values when flows are read from a budget file
+    call mem_set_transient('NODELIST', mempath)
+    call mem_set_transient('FLOW', mempath)
+    call mem_set_transient('AUXVAR', mempath)
     !
     ! -- initialize
     this%name = ''

@@ -22,7 +22,8 @@ module StructArrayModule
                                      remove_existing_link
   use TimeSeriesLinkModule, only: TimeSeriesLinkType
   use InputDefinitionModule, only: InputParamDefinitionType
-  use MemoryManagerModule, only: mem_allocate, mem_reallocate, mem_setptr
+  use MemoryManagerModule, only: mem_allocate, mem_reallocate, mem_setptr, &
+                                 mem_set_transient
   use CharacterStringModule, only: CharacterStringType
   use STLVecIntModule, only: STLVecInt
   use IdmLoggerModule, only: idm_log_var
@@ -576,6 +577,8 @@ contains
       ! update structvector
       this%struct_vectors(icol)%int1d => p_int1d
       this%struct_vectors(icol)%size = this%nrow
+      ! period loaders reallocate as the row count grows
+      if (overwrite) call mem_set_transient(varname, this%mempath)
     case (MTYPE_DBL)
       if (isize > -1) then
         call mem_setptr(p_dbl1d, varname, this%mempath)
@@ -613,6 +616,8 @@ contains
 
       this%struct_vectors(icol)%dbl1d => p_dbl1d
       this%struct_vectors(icol)%size = this%nrow
+      ! period loaders reallocate as the row count grows
+      if (overwrite) call mem_set_transient(varname, this%mempath)
       !
     case (MTYPE_STR)
       if (isize > -1) then
@@ -653,6 +658,8 @@ contains
 
       this%struct_vectors(icol)%charstr1d => p_charstr1d
       this%struct_vectors(icol)%size = this%nrow
+      ! period loaders reallocate as the row count grows
+      if (overwrite) call mem_set_transient(varname, this%mempath)
     case (MTYPE_INTVEC) ! intvector reallocate unimplemented
       errmsg = 'StructArray::load_deferred_vector &
                &intvector reallocate unimplemented.'
