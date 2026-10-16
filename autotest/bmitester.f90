@@ -3,7 +3,7 @@
 program bmitester
   use, intrinsic :: iso_fortran_env, only: error_unit
   use testdrive, only: new_testsuite, testsuite_type, select_suite, &
-    & run_selected, get_argument
+    & run_selected
   use TestBmi, only: collect_bmi
   use TestBmiXmi, only: collect_bmixmi
   use TestBmiPointers, only: collect_bmipointers
@@ -20,6 +20,8 @@ program bmitester
                new_testsuite("BmiPointers", collect_bmipointers) &
                ]
 
+  ! read the arguments here rather than with testdrive's get_argument, which
+  ! sees none on macOS when test-drive links a different libgfortran
   call get_argument(1, suite_name)
   call get_argument(2, test_name)
 
@@ -42,5 +44,21 @@ program bmitester
   if (stat /= 0) then
     error stop 1
   end if
+
+contains
+
+  !> @brief Get a command-line argument, unallocated if it is missing
+  !<
+  subroutine get_argument(idx, arg)
+    integer, intent(in) :: idx
+    character(len=:), allocatable, intent(out) :: arg
+    integer :: length, stat
+
+    call get_command_argument(idx, length=length, status=stat)
+    if (stat /= 0 .or. length == 0) return
+    allocate (character(len=length) :: arg)
+    call get_command_argument(idx, arg, status=stat)
+    if (stat /= 0) deallocate (arg)
+  end subroutine get_argument
 
 end program bmitester
