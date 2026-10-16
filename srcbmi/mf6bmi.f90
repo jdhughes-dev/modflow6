@@ -216,117 +216,85 @@ contains
 
   end function get_time_step
 
-  !> @brief Get the number of input variables in the simulation
+  !> @brief Get the number of variables in a variable set
   !!
-  !! This concerns all variables stored in the memory manager
+  !! The sets 'input' and 'output' both hold every variable in the memory
+  !! manager.
   !<
-  function get_input_item_count(count) result(bmi_status) &
-    bind(C, name="get_input_item_count")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_input_item_count
+  function get_varset_member_count(c_set_name, count) result(bmi_status) &
+    bind(C, name="get_varset_member_count")
+    !DIR$ ATTRIBUTES DLLEXPORT :: get_varset_member_count
     ! -- dummy variables
-    integer(kind=c_int), intent(out) :: count !< the number of input variables
+    character(kind=c_char), intent(in) :: c_set_name(*) !< name of the variable set
+    integer(kind=c_int), intent(out) :: count !< the number of variables in the set
     integer(kind=c_int) :: bmi_status !< BMI status code
+    ! -- local variables
+    character(len=:), allocatable :: set_name
 
-    count = memorystore%count()
+    set_name = char_array_to_string(c_set_name, &
+                                    strlen(c_set_name, BMI_LENSETNAME))
+    select case (set_name)
+    case ('input', 'output')
+      count = memorystore%count()
+      bmi_status = BMI_SUCCESS
+    case default
+      count = -1
+      write (bmi_last_error, fmt_unknown_varset) trim(set_name)
+      call report_bmi_error(bmi_last_error)
+      bmi_status = BMI_FAILURE
+    end select
 
-    bmi_status = BMI_SUCCESS
+  end function get_varset_member_count
 
-  end function get_input_item_count
-
-  !> @brief Get the number of output variables in the simulation
-  !!
-  !! This concerns all variables stored in the memory manager
-  !<
-  function get_output_item_count(count) result(bmi_status) &
-    bind(C, name="get_output_item_count")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_output_item_count
-    ! -- dummy variables
-    integer(kind=c_int), intent(out) :: count !< the number of output variables
-    integer(kind=c_int) :: bmi_status !< BMI status code
-
-    count = memorystore%count()
-
-    bmi_status = BMI_SUCCESS
-
-  end function get_output_item_count
-
-  !> @brief Returns all input variables in the simulation
-  !!
-  !! This functions returns the full address for all variables in the
-  !! memory manager
+  !> @brief Get the full addresses of the variables in a variable set
   !!
   !! The array @p c_names should be pre-allocated of proper size:
   !!
-  !! size = BMI_LENVARADDRESS *  get_input_item_count()
+  !! size = BMI_LENVARADDRESS * get_varset_member_count()
   !!
   !! The strings will be written contiguously with stride equal to
   !! BMI_LENVARADDRESS and nul-terminated where the trailing spaces start:
   !!
   !! c_names = 'variable_address_1\x00 ... variable_address_2\x00 ... ' etc.
   !<
-  function get_input_var_names(c_names) result(bmi_status) &
-    bind(C, name="get_input_var_names")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_input_var_names
+  function get_varset_members(c_set_name, c_names) result(bmi_status) &
+    bind(C, name="get_varset_members")
+    !DIR$ ATTRIBUTES DLLEXPORT :: get_varset_members
     ! -- dummy variables
-    character(kind=c_char, len=1), intent(inout) :: c_names(*) !< array with memory paths for input variables
+    character(kind=c_char), intent(in) :: c_set_name(*) !< name of the variable set
+    character(kind=c_char, len=1), intent(inout) :: c_names(*) !< array with the addresses of the variables
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
+    character(len=:), allocatable :: set_name
     integer(I4B) :: start, i
     type(MemoryContainerIteratorType), allocatable :: itr
     type(MemoryType), pointer :: mt => null()
     character(len=LENMEMADDRESS) :: var_address
 
-    start = 1
-    itr = memorystore%iterator()
-    do while (itr%has_next())
-      call itr%next()
-      mt => itr%value()
-      var_address = create_mem_address(mt%path, mt%name)
-      do i = 1, len(trim(var_address))
-        c_names(start + i - 1) = var_address(i:i)
+    set_name = char_array_to_string(c_set_name, &
+                                    strlen(c_set_name, BMI_LENSETNAME))
+    select case (set_name)
+    case ('input', 'output')
+      start = 1
+      itr = memorystore%iterator()
+      do while (itr%has_next())
+        call itr%next()
+        mt => itr%value()
+        var_address = create_mem_address(mt%path, mt%name)
+        do i = 1, len(trim(var_address))
+          c_names(start + i - 1) = var_address(i:i)
+        end do
+        c_names(start + i) = c_null_char
+        start = start + BMI_LENVARADDRESS
       end do
-      c_names(start + i) = c_null_char
-      start = start + BMI_LENVARADDRESS
-    end do
+      bmi_status = BMI_SUCCESS
+    case default
+      write (bmi_last_error, fmt_unknown_varset) trim(set_name)
+      call report_bmi_error(bmi_last_error)
+      bmi_status = BMI_FAILURE
+    end select
 
-    bmi_status = BMI_SUCCESS
-
-  end function get_input_var_names
-
-  !> @brief Returns all output variables in the simulation
-  !!
-  !! This function works analogously to get_input_var_names(),
-  !! and currently returns the same set of memory variables,
-  !! which is all of them!
-  !<
-  function get_output_var_names(c_names) result(bmi_status) &
-    bind(C, name="get_output_var_names")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_output_var_names
-    ! -- dummy variables
-    character(kind=c_char, len=1), intent(inout) :: c_names(*) !< array with memory paths for output variables
-    integer(kind=c_int) :: bmi_status !< BMI status code
-    ! -- local variables
-    integer(I4B) :: start, i
-    type(MemoryContainerIteratorType), allocatable :: itr
-    type(MemoryType), pointer :: mt => null()
-    character(len=LENMEMADDRESS) :: var_address
-
-    start = 1
-    itr = memorystore%iterator()
-    do while (itr%has_next())
-      call itr%next()
-      mt => itr%value()
-      var_address = create_mem_address(mt%path, mt%name)
-      do i = 1, len(trim(var_address))
-        c_names(start + i - 1) = var_address(i:i)
-      end do
-      c_names(start + i) = c_null_char
-      start = start + BMI_LENVARADDRESS
-    end do
-
-    bmi_status = BMI_SUCCESS
-
-  end function get_output_var_names
+  end function get_varset_members
 
   !> @brief Get the size (in bytes) of a single element of a variable
   !<
