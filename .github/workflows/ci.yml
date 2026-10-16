@@ -1,6 +1,9 @@
 name: MODFLOW 6 continuous integration
 on:
   push:
+    # the BMI 3 prototype is tested by bmi3.yml
+    branches-ignore:
+      - bmi-3
     paths-ignore:
       - "**.md"
       - "**.pdf"

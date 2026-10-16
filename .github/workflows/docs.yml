@@ -1,6 +1,9 @@
 name: MODFLOW 6 documentation
 on:
   push:
+    # the BMI 3 prototype is tested by bmi3.yml
+    branches-ignore:
+      - bmi-3
     paths-ignore:
       - '.github/workflows/release.yml'
       - '.github/workflows/ci.yml'
