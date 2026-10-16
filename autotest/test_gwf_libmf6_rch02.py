@@ -163,14 +163,14 @@ def build_models(idx, test):
 
 
 def run_perturbation(mf6, max_iter, recharge, tag, rch):
-    mf6.prepare_solve()
+    mf6.xmi.prepare_solve()
     kiter = 0
     while kiter < max_iter:
         # update recharge
         recharge[:] = rch
-        mf6.set_value(tag, recharge)
+        mf6.set_value(mf6.var_index(tag), recharge)
         # solve with updated well rate
-        has_converged = mf6.solve()
+        has_converged = mf6.xmi.solve()
         kiter += 1
         if has_converged:
             break
@@ -211,16 +211,16 @@ def api_func(exe, idx, model_ws=None):
     end_time = mf6.get_end_time()
 
     # get pointer to simulated heads
-    head_tag = mf6.get_var_address("X", name)
-    head = mf6.get_value_ptr(head_tag)
+    head_tag = mf6.xmi.get_var_address("X", name)
+    head = mf6.pointers.get_value_ptr(mf6.var_index(head_tag))
 
     # maximum outer iterations
-    mxit_tag = mf6.get_var_address("MXITER", "SLN_1")
-    max_iter = mf6.get_value(mxit_tag)
+    mxit_tag = mf6.xmi.get_var_address("MXITER", "SLN_1")
+    max_iter = mf6.get_value(mf6.var_index(mxit_tag))
 
     # get copy of recharge array
-    rch_tag = mf6.get_var_address("RECHARGE", name, rch_pname)
-    new_recharge = mf6.get_value(rch_tag).copy()
+    rch_tag = mf6.xmi.get_var_address("RECHARGE", name, rch_pname)
+    new_recharge = mf6.get_value(mf6.var_index(rch_tag)).copy()
 
     # determine initial recharge value
     np.random.seed(0)
@@ -234,7 +234,7 @@ def api_func(exe, idx, model_ws=None):
 
         # get dt and prepare for non-linear iterations
         dt = mf6.get_time_step()
-        mf6.prepare_time_step(dt)
+        mf6.xmi.prepare_time_step(dt)
 
         est_iter = 0
         while est_iter < 100:
@@ -279,10 +279,10 @@ def api_func(exe, idx, model_ws=None):
             return False, open(output_file_path).readlines()
 
         # finalize time step
-        mf6.finalize_solve()
+        mf6.xmi.finalize_solve()
 
         # finalize time step and update time
-        mf6.finalize_time_step()
+        mf6.xmi.finalize_time_step()
         current_time = mf6.get_current_time()
 
         # increment counter

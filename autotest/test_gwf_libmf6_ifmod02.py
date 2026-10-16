@@ -352,16 +352,16 @@ def check_interface_models(mf6):
     gfc_topleft_2 = f"GWFCON1_{exg2_id}"
 
     # interface model nr.1
-    addr = mf6.get_var_address("IDXTOGLOBALIDX", gfc_topleft_1, "GC")
-    idxToGlobalIdx_1 = mf6.get_value_ptr(addr)
+    addr = mf6.xmi.get_var_address("IDXTOGLOBALIDX", gfc_topleft_1, "GC")
+    idxToGlobalIdx_1 = mf6.pointers.get_value_ptr(mf6.var_index(addr))
     assert np.size(idxToGlobalIdx_1) == 12
     assert np.array_equal(idxToGlobalIdx_1, [3, 4, 5, 21, 22, 8, 9, 10, 26, 27, 14, 15])
-    addr = mf6.get_var_address("ia", gfc_topleft_1, "gc/con")
-    ia_1 = mf6.get_value_ptr(addr)
-    addr = mf6.get_var_address("ja", gfc_topleft_1, "gc/con")
-    ja_1 = mf6.get_value_ptr(addr)
-    addr = mf6.get_var_address("mask", gfc_topleft_1, "gc/con")
-    mask_1 = mf6.get_value_ptr(addr)
+    addr = mf6.xmi.get_var_address("ia", gfc_topleft_1, "gc/con")
+    ia_1 = mf6.pointers.get_value_ptr(mf6.var_index(addr))
+    addr = mf6.xmi.get_var_address("ja", gfc_topleft_1, "gc/con")
+    ja_1 = mf6.pointers.get_value_ptr(mf6.var_index(addr))
+    addr = mf6.xmi.get_var_address("mask", gfc_topleft_1, "gc/con")
+    mask_1 = mf6.pointers.get_value_ptr(mf6.var_index(addr))
 
     # we have the following connections to calculate,
     # check if the mask is set correctly
@@ -389,8 +389,8 @@ def check_interface_models(mf6):
     assert len(connections) == 0
 
     # interface model nr.2
-    addr = mf6.get_var_address("IDXTOGLOBALIDX", gfc_topleft_2, "GC")
-    idxToGlobalIdx_2 = mf6.get_value_ptr(addr)
+    addr = mf6.xmi.get_var_address("IDXTOGLOBALIDX", gfc_topleft_2, "GC")
+    idxToGlobalIdx_2 = mf6.pointers.get_value_ptr(mf6.var_index(addr))
     assert np.size(idxToGlobalIdx_2) == 10
     assert np.array_equal(idxToGlobalIdx_2, [6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
 

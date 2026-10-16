@@ -261,8 +261,8 @@ def check_interface_models(mf6):
 
     # check extent for interface model, it's always
     # DISU so we have cellxy:
-    addr = mf6.get_var_address("CELLXY", ifm, "DIS")
-    cellxy = mf6.get_value_ptr(addr)
+    addr = mf6.xmi.get_var_address("CELLXY", ifm, "DIS")
+    cellxy = mf6.pointers.get_value_ptr(mf6.var_index(addr))
 
     assert np.size(cellxy, 0) == 4
 

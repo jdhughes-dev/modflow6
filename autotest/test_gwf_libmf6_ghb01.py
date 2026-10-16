@@ -203,21 +203,21 @@ def api_func(exe, idx, model_ws=None):
     end_time = mf6.get_end_time()
 
     # maximum outer iterations
-    max_iter = mf6.get_value(mf6.get_var_address("MXITER", "SLN_1"))
+    max_iter = mf6.get_value(mf6.var_index(mf6.xmi.get_var_address("MXITER", "SLN_1")))
 
     # get pointer to simulated heads
-    head_tag = mf6.get_var_address("X", name.upper())
-    head = mf6.get_value_ptr(head_tag)
+    head_tag = mf6.xmi.get_var_address("X", name.upper())
+    head = mf6.pointers.get_value_ptr(mf6.var_index(head_tag))
 
     # get pointers to API data
-    nbound_tag = mf6.get_var_address("NBOUND", name.upper(), ghb_packname)
-    nbound = mf6.get_value_ptr(nbound_tag)
-    nodelist_tag = mf6.get_var_address("NODELIST", name.upper(), ghb_packname)
-    nodelist = mf6.get_value_ptr(nodelist_tag)
-    hcof_tag = mf6.get_var_address("HCOF", name.upper(), ghb_packname)
-    hcof = mf6.get_value_ptr(hcof_tag)
-    rhs_tag = mf6.get_var_address("RHS", name.upper(), ghb_packname)
-    rhs = mf6.get_value_ptr(rhs_tag)
+    nbound_tag = mf6.xmi.get_var_address("NBOUND", name.upper(), ghb_packname)
+    nbound = mf6.pointers.get_value_ptr(mf6.var_index(nbound_tag))
+    nodelist_tag = mf6.xmi.get_var_address("NODELIST", name.upper(), ghb_packname)
+    nodelist = mf6.pointers.get_value_ptr(mf6.var_index(nodelist_tag))
+    hcof_tag = mf6.xmi.get_var_address("HCOF", name.upper(), ghb_packname)
+    hcof = mf6.pointers.get_value_ptr(mf6.var_index(hcof_tag))
+    rhs_tag = mf6.xmi.get_var_address("RHS", name.upper(), ghb_packname)
+    rhs = mf6.pointers.get_value_ptr(mf6.var_index(rhs_tag))
 
     # set nbound and nodelist
     nbound[0] = 1
@@ -229,18 +229,18 @@ def api_func(exe, idx, model_ws=None):
         dt = mf6.get_time_step()
 
         # prepare... and reads the RIV data from file!
-        mf6.prepare_time_step(dt)
+        mf6.xmi.prepare_time_step(dt)
 
         # convergence loop
         kiter = 0
-        mf6.prepare_solve()
+        mf6.xmi.prepare_solve()
 
         while kiter < max_iter:
             # update api package
             hcof[:], rhs[:] = api_ghb_pak(hcof, rhs)
 
             # solve with updated api data
-            has_converged = mf6.solve()
+            has_converged = mf6.xmi.solve()
             kiter += 1
 
             if has_converged:
@@ -249,10 +249,10 @@ def api_func(exe, idx, model_ws=None):
                 break
 
         # finalize time step
-        mf6.finalize_solve()
+        mf6.xmi.finalize_solve()
 
         # finalize time step and update time
-        mf6.finalize_time_step()
+        mf6.xmi.finalize_time_step()
         current_time = mf6.get_current_time()
 
         # terminate if model did not converge

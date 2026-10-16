@@ -174,11 +174,11 @@ def api_func(exe, idx, model_ws=None):
     end_time = mf6.get_end_time()
 
     # reset sy with bmi set_value
-    sy_tag = mf6.get_var_address("SY", name, "STO")
-    new_sy = mf6.get_value(sy_tag)
+    sy_tag = mf6.xmi.get_var_address("SY", name, "STO")
+    new_sy = mf6.get_value(mf6.var_index(sy_tag))
     new_sy.fill(sy_val)
 
-    mf6.set_value(sy_tag, new_sy)
+    mf6.set_value(mf6.var_index(sy_tag), new_sy)
 
     # model time loop
     idx = 0

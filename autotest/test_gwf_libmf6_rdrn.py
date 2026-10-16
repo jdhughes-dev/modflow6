@@ -150,26 +150,40 @@ def _run_reverse_drain(libmf6, ws, results):
     mf6 = ModflowApi(str(libmf6), working_directory=str(ws))
     mf6.initialize()
 
-    nodelist = mf6.get_value_ptr(mf6.get_var_address("NODELIST", MODELNAME, "RDRN"))
-    hcof = mf6.get_value_ptr(mf6.get_var_address("HCOF", MODELNAME, "RDRN"))
-    rhs = mf6.get_value_ptr(mf6.get_var_address("RHS", MODELNAME, "RDRN"))
-    nbound = mf6.get_value_ptr(mf6.get_var_address("NBOUND", MODELNAME, "RDRN"))
-    head = mf6.get_value_ptr(mf6.get_var_address("X", MODELNAME))
-    kper = mf6.get_value_ptr(mf6.get_var_address("KPER", "TDIS"))
+    nodelist = mf6.pointers.get_value_ptr(
+        mf6.var_index(mf6.xmi.get_var_address("NODELIST", MODELNAME, "RDRN"))
+    )
+    hcof = mf6.pointers.get_value_ptr(
+        mf6.var_index(mf6.xmi.get_var_address("HCOF", MODELNAME, "RDRN"))
+    )
+    rhs = mf6.pointers.get_value_ptr(
+        mf6.var_index(mf6.xmi.get_var_address("RHS", MODELNAME, "RDRN"))
+    )
+    nbound = mf6.pointers.get_value_ptr(
+        mf6.var_index(mf6.xmi.get_var_address("NBOUND", MODELNAME, "RDRN"))
+    )
+    head = mf6.pointers.get_value_ptr(
+        mf6.var_index(mf6.xmi.get_var_address("X", MODELNAME))
+    )
+    kper = mf6.pointers.get_value_ptr(
+        mf6.var_index(mf6.xmi.get_var_address("KPER", "TDIS"))
+    )
 
     # assign the reverse drains to the active cells (constant for the run)
     nbound[0] = active_nodes.size
     nodelist[:] = active_nodes
 
-    max_iter = int(mf6.get_value(mf6.get_var_address("MXITER", "SLN_1"))[0])
+    max_iter = int(
+        mf6.get_value(mf6.var_index(mf6.xmi.get_var_address("MXITER", "SLN_1")))[0]
+    )
 
     period_per_step = []
     inflow_per_step = []
     current_time = mf6.get_current_time()
     end_time = mf6.get_end_time()
     while current_time < end_time:
-        mf6.prepare_time_step(mf6.get_time_step())
-        mf6.prepare_solve()
+        mf6.xmi.prepare_time_step(mf6.get_time_step())
+        mf6.xmi.prepare_solve()
         kiter = 0
         while kiter < max_iter:
             # head-dependent reverse-drain term, evaluated at the current head
@@ -180,7 +194,7 @@ def _run_reverse_drain(libmf6, ws, results):
             # under-relax (damp) the term before each solve for stability
             hcof[:] = (1.0 - damping) * hcof + damping * new_hcof
             rhs[:] = (1.0 - damping) * rhs + damping * new_rhs
-            if mf6.solve():
+            if mf6.xmi.solve():
                 break
             kiter += 1
         else:
@@ -189,8 +203,8 @@ def _run_reverse_drain(libmf6, ws, results):
         h = head[active_nodes - 1]
         period_per_step.append(int(kper[0]))
         inflow_per_step.append(float(np.sum(cond * np.maximum(elevations - h, 0.0))))
-        mf6.finalize_solve()
-        mf6.finalize_time_step()
+        mf6.xmi.finalize_solve()
+        mf6.xmi.finalize_time_step()
         current_time = mf6.get_current_time()
 
     results["heads"] = head[active_nodes - 1].copy()

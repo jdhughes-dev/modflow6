@@ -7,8 +7,9 @@ Each routine fills a caller-allocated buffer sized by the matching BMI length
 constant, and must write no more than the string and its null terminator.
 
 Cases:
-  - libmf6_strings : get_component_name, get_version, and get_grid_type return
-                     the expected strings and leave the rest of the buffer alone.
+  - libmf6_strings : get_component_name, get_bmi_version, the xmi get_version,
+                     and get_grid_type return the expected strings and leave
+                     the rest of the buffer alone.
 """
 
 import os
@@ -123,17 +124,17 @@ def build_models(idx, test):
     return sim, sim_compare
 
 
-def call_string_routine(mf6, name, size_name, *args):
+def call_string_routine(mf6, function, size_name, *args):
     """Call a BMI string routine and return the string it wrote."""
     size = mf6.get_constant_int(size_name)
     buff = create_string_buffer(sentinel * size, size)
-    status = getattr(mf6.lib, name)(*args, byref(buff))
-    assert status == 0, f"{name} returned status {status}"
+    status = function(*args, byref(buff))
+    assert status == 0, f"{function} returned status {status}"
 
     # everything past the null terminator must be untouched
     value = buff.value.decode()
     tail = buff.raw[len(value) + 1 :]
-    assert tail == sentinel * len(tail), f"{name} wrote past the null terminator"
+    assert tail == sentinel * len(tail), f"{function} wrote past the null terminator"
 
     return value
 
@@ -158,23 +159,29 @@ def api_func(exe, idx, model_ws=None):
     except:
         return False, open(output_file_path).readlines()
 
-    grid_id = mf6.get_var_grid(mf6.get_var_address("X", model_name))
+    grid_id = mf6.get_var_grid(mf6.var_index(mf6.xmi.get_var_address("X", model_name)))
 
     # strings returned through the wrapper
     assert mf6.get_component_name() == "MODFLOW 6"
-    version = mf6.get_version()
+    version = mf6.xmi.get_version()
     assert re.match(r"^\d+\.\d+\.\d+", version), f"unexpected version '{version}'"
     assert mf6.get_grid_type(grid_id) == "rectilinear"
+    assert mf6.get_bmi_version() == "3.0"
 
     # same strings, checking what each routine wrote into the buffer
     assert (
-        call_string_routine(mf6, "get_component_name", "BMI_LENCOMPONENTNAME")
+        call_string_routine(mf6, mf6.lib.get_component_name, "BMI_LENCOMPONENTNAME")
         == "MODFLOW 6"
     )
-    assert call_string_routine(mf6, "get_version", "BMI_LENVERSION") == version
+    assert call_string_routine(mf6, mf6.lib.get_bmi_version, "BMI_LENVERSION") == "3.0"
+    # the xmi get_version is reached through the extension's function table
+    assert (
+        call_string_routine(mf6, mf6.xmi._table.get_version, "BMI_LENVERSION")
+        == version
+    )
     assert (
         call_string_routine(
-            mf6, "get_grid_type", "BMI_LENGRIDTYPE", byref(c_int(grid_id))
+            mf6, mf6.lib.get_grid_type, "BMI_LENGRIDTYPE", byref(c_int(grid_id))
         )
         == "rectilinear"
     )

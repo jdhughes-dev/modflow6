@@ -59,16 +59,16 @@ def api_func(exe, idx, model_ws=None):
     while current_time < end_time:
         # get dt and prepare for non-linear iterations
         dt = mf6.get_time_step()
-        mf6.prepare_time_step(dt)
+        mf6.xmi.prepare_time_step(dt)
 
         # convergence loop
         kiter = 0
-        mf6.prepare_solve()
-        has_converged = mf6.solve()
-        mf6.finalize_solve()
+        mf6.xmi.prepare_solve()
+        has_converged = mf6.xmi.solve()
+        mf6.xmi.finalize_solve()
 
         # finalize time step and update time
-        mf6.finalize_time_step()
+        mf6.xmi.finalize_time_step()
         current_time = mf6.get_current_time()
 
         # increment counter

@@ -171,25 +171,25 @@ def api_func(exe, idx, model_ws=None):
     end_time = mf6.get_end_time()
 
     # get pointer to simulated heads
-    head_tag = mf6.get_var_address("X", "LIBGWF_EVT01")
-    head = mf6.get_value_ptr(head_tag)
+    head_tag = mf6.xmi.get_var_address("X", "LIBGWF_EVT01")
+    head = mf6.pointers.get_value_ptr(mf6.var_index(head_tag))
 
     # maximum outer iterations
-    mxit_tag = mf6.get_var_address("MXITER", "SLN_1")
-    max_iter = mf6.get_value(mxit_tag)
+    mxit_tag = mf6.xmi.get_var_address("MXITER", "SLN_1")
+    max_iter = mf6.get_value(mf6.var_index(mxit_tag))
 
     # get copy of well data
-    well_tag = mf6.get_var_address("Q", name, "WEL_0")
-    well = mf6.get_value(well_tag)
+    well_tag = mf6.xmi.get_var_address("Q", name, "WEL_0")
+    well = mf6.get_value(mf6.var_index(well_tag))
 
     # check NPF type
-    package_type_tag = mf6.get_var_address("PACKAGE_TYPE", name, "NPF")
-    package_type = mf6.get_value(package_type_tag)[0]
+    package_type_tag = mf6.xmi.get_var_address("PACKAGE_TYPE", name, "NPF")
+    package_type = mf6.get_value(mf6.var_index(package_type_tag))[0]
     assert package_type == "NPF", f"{package_type} /= NPF"
 
     # check wel type
-    package_type_tag = mf6.get_var_address("PACKAGE_TYPE", name, "WEL_0")
-    package_type = mf6.get_value(package_type_tag)[0]
+    package_type_tag = mf6.xmi.get_var_address("PACKAGE_TYPE", name, "WEL_0")
+    package_type = mf6.get_value(mf6.var_index(package_type_tag))[0]
     assert package_type == "WEL", f"{package_type} /= WEL"
 
     twell = np.zeros(ncol, dtype=np.float64)
@@ -199,20 +199,20 @@ def api_func(exe, idx, model_ws=None):
     while current_time < end_time:
         # get dt and prepare for non-linear iterations
         dt = mf6.get_time_step()
-        mf6.prepare_time_step(dt)
+        mf6.xmi.prepare_time_step(dt)
 
         # convergence loop
         kiter = 0
-        mf6.prepare_solve()
+        mf6.xmi.prepare_solve()
 
         while kiter < max_iter:
             # update well rate
             twell[:] = head2et_wellrate(head[0])
             well[:] = twell[:]
-            mf6.set_value(well_tag, well)
+            mf6.set_value(mf6.var_index(well_tag), well)
 
             # solve with updated well rate
-            has_converged = mf6.solve()
+            has_converged = mf6.xmi.solve()
             kiter += 1
 
             if has_converged:
@@ -225,10 +225,10 @@ def api_func(exe, idx, model_ws=None):
             return False, open(output_file_path).readlines()
 
         # finalize time step
-        mf6.finalize_solve()
+        mf6.xmi.finalize_solve()
 
         # finalize time step and update time
-        mf6.finalize_time_step()
+        mf6.xmi.finalize_time_step()
         current_time = mf6.get_current_time()
 
         # increment counter

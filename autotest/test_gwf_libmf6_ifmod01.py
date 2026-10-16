@@ -251,15 +251,15 @@ def check_interface_models(mf6):
     gc_name_left = f"GWFCON1_{exchange_id}"
 
     # XT3D flag should be set to 1
-    mem_addr = mf6.get_var_address("IXT3D", ifm_name_left, "NPF")
-    ixt3d = mf6.get_value_ptr(mem_addr)[0]
+    mem_addr = mf6.xmi.get_var_address("IXT3D", ifm_name_left, "NPF")
+    ixt3d = mf6.pointers.get_value_ptr(mf6.var_index(mem_addr))[0]
     assert ixt3d == 1, f"Interface model for {name_left} should have XT3D enabled"
 
     # check if n2 > n1, then cell 1 is below 2
-    mem_addr = mf6.get_var_address("TOP", ifm_name_left, "DIS")
-    top = mf6.get_value_ptr(mem_addr)
-    mem_addr = mf6.get_var_address("BOT", ifm_name_left, "DIS")
-    bot = mf6.get_value_ptr(mem_addr)
+    mem_addr = mf6.xmi.get_var_address("TOP", ifm_name_left, "DIS")
+    top = mf6.pointers.get_value_ptr(mf6.var_index(mem_addr))
+    mem_addr = mf6.xmi.get_var_address("BOT", ifm_name_left, "DIS")
+    bot = mf6.pointers.get_value_ptr(mf6.var_index(mem_addr))
     zc = (bot + top) / 2
     assert all([zc[i] >= zc[i + 1] for i in range(len(zc) - 1)]), (
         f"Interface model for {name_left} contains incorrectly numbered cells"
@@ -268,12 +268,12 @@ def check_interface_models(mf6):
     # confirm some properties for the 'left' interface
     # model, looping over the models that contribute:
     for name in [name_left, name_right]:
-        mem_addr = mf6.get_var_address("IDXTOGLOBALIDX", gc_name_left, "GC")
-        to_global = mf6.get_value_ptr(mem_addr)
-        mem_addr = mf6.get_var_address("MOFFSET", name)
-        m_offset = mf6.get_value_ptr(mem_addr)[0]
-        mem_addr = mf6.get_var_address("NODES", name, "DIS")
-        nr_nodes = mf6.get_value_ptr(mem_addr)[0]
+        mem_addr = mf6.xmi.get_var_address("IDXTOGLOBALIDX", gc_name_left, "GC")
+        to_global = mf6.pointers.get_value_ptr(mf6.var_index(mem_addr))
+        mem_addr = mf6.xmi.get_var_address("MOFFSET", name)
+        m_offset = mf6.pointers.get_value_ptr(mf6.var_index(mem_addr))[0]
+        mem_addr = mf6.xmi.get_var_address("NODES", name, "DIS")
+        nr_nodes = mf6.pointers.get_value_ptr(mf6.var_index(mem_addr))[0]
 
         for i, global_id in enumerate(to_global):
             iface_idx = i + 1
@@ -281,19 +281,19 @@ def check_interface_models(mf6):
                 local_id = global_id - m_offset
 
                 # NPF/K11
-                mem_addr = mf6.get_var_address("K11", name, "NPF")
-                k11_model = mf6.get_value_ptr(mem_addr)
-                mem_addr = mf6.get_var_address("K11", ifm_name_left, "NPF")
-                k11_interface = mf6.get_value_ptr(mem_addr)
+                mem_addr = mf6.xmi.get_var_address("K11", name, "NPF")
+                k11_model = mf6.pointers.get_value_ptr(mf6.var_index(mem_addr))
+                mem_addr = mf6.xmi.get_var_address("K11", ifm_name_left, "NPF")
+                k11_interface = mf6.pointers.get_value_ptr(mf6.var_index(mem_addr))
                 assert k11_model[local_id - 1] == k11_interface[iface_idx - 1], (
                     "K11 in interface model does not match"
                 )
 
                 # DIS/AREA
-                mem_addr = mf6.get_var_address("AREA", name, "DIS")
-                area_model = mf6.get_value_ptr(mem_addr)
-                mem_addr = mf6.get_var_address("AREA", ifm_name_left, "DIS")
-                area_interface = mf6.get_value_ptr(mem_addr)
+                mem_addr = mf6.xmi.get_var_address("AREA", name, "DIS")
+                area_model = mf6.pointers.get_value_ptr(mf6.var_index(mem_addr))
+                mem_addr = mf6.xmi.get_var_address("AREA", ifm_name_left, "DIS")
+                area_interface = mf6.pointers.get_value_ptr(mf6.var_index(mem_addr))
                 assert area_model[local_id - 1] == area_interface[iface_idx - 1], (
                     "AREA in interface model does not match"
                 )
