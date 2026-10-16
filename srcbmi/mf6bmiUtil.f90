@@ -11,6 +11,7 @@ module mf6bmiUtil
   use MessageModule, only: write_message
   use SimVariablesModule, only: istdout
   use MemoryHelperModule, only: split_mem_address, split_mem_path
+  use HashTableModule, only: HashTableType, hash_table_cr, hash_table_da
   implicit none
 
   ! the following exported parameters will trigger annoying warnings with
@@ -53,6 +54,11 @@ module mf6bmiUtil
   character(len=*), parameter :: EXT_POINTERS = 'bmi:pointers' !< name of the pointers extension
   logical(LGP) :: xmi_enabled = .false. !< true when xmi was negotiated at initialize
   logical(LGP) :: pointers_enabled = .false. !< true when bmi:pointers was negotiated at initialize
+
+  character(len=LENMEMADDRESS), dimension(:), allocatable :: &
+    index_addresses !< variable address for each variable index
+  integer(I4B) :: nindices = 0 !< number of variable indices assigned
+  type(HashTableType), pointer :: index_map => null() !< variable index for each address
 
 contains
 
@@ -111,6 +117,142 @@ contains
     end subroutine add_name
 
   end subroutine negotiate_extensions
+
+  !> @brief Assign an index to every variable in the memory manager
+  !!
+  !! Indices follow the memory manager order at the end of initialize;
+  !! variables created later are appended when first looked up, so an
+  !! index never changes meaning.
+  !<
+  subroutine create_var_indices()
+    ! -- modules
+    use MemoryManagerModule, only: memorystore
+    use MemoryContainerIteratorModule, only: MemoryContainerIteratorType
+    use MemoryTypeModule, only: MemoryType
+    use MemoryHelperModule, only: create_mem_address
+    ! -- local variables
+    type(MemoryContainerIteratorType), allocatable :: itr
+    type(MemoryType), pointer :: mt
+    integer(I4B) :: idx
+
+    call clear_var_indices()
+    call hash_table_cr(index_map)
+    allocate (index_addresses(max(1, memorystore%count())))
+
+    itr = memorystore%iterator()
+    do while (itr%has_next())
+      call itr%next()
+      mt => itr%value()
+      idx = add_var_index(create_mem_address(mt%path, mt%name))
+    end do
+
+  end subroutine create_var_indices
+
+  !> @brief Release the variable indices
+  !<
+  subroutine clear_var_indices()
+    if (associated(index_map)) then
+      call hash_table_da(index_map)
+    end if
+    if (allocated(index_addresses)) then
+      deallocate (index_addresses)
+    end if
+    nindices = 0
+  end subroutine clear_var_indices
+
+  !> @brief Give the variable address the next index
+  !<
+  function add_var_index(var_address) result(idx)
+    ! -- dummy variables
+    character(len=*), intent(in) :: var_address !< full address of a variable
+    integer(I4B) :: idx !< the new index
+    ! -- local variables
+    character(len=LENMEMADDRESS), dimension(:), allocatable :: tmp
+    integer(I4B) :: i
+
+    if (nindices == size(index_addresses)) then
+      allocate (tmp(2 * nindices))
+      do i = 1, nindices
+        tmp(i) = index_addresses(i)
+      end do
+      call move_alloc(tmp, index_addresses)
+    end if
+    nindices = nindices + 1
+    idx = nindices
+    index_addresses(idx) = var_address
+    call index_map%add(trim(var_address), idx)
+
+  end function add_var_index
+
+  !> @brief Get the index of an existing variable, assigning one if new
+  !<
+  function find_var_index(var_address) result(idx)
+    ! -- dummy variables
+    character(len=*), intent(in) :: var_address !< full address of a variable
+    integer(I4B) :: idx !< the variable index
+
+    idx = index_map%get(trim(var_address))
+    if (idx == 0) then
+      idx = add_var_index(var_address)
+    end if
+
+  end function find_var_index
+
+  !> @brief Get the address of the variable with the given index
+  !<
+  subroutine index_to_address(c_var_index, var_address, success)
+    ! -- dummy variables
+    integer(c_int), intent(in) :: c_var_index !< index of the variable
+    character(len=LENMEMADDRESS), intent(out) :: var_address !< full address of the variable
+    logical(LGP), intent(out) :: success !< false when invalid
+
+    success = (c_var_index >= 1 .and. c_var_index <= nindices)
+    if (success) then
+      var_address = index_addresses(c_var_index)
+    else
+      var_address = ''
+      write (bmi_last_error, fmt_invalid_index) c_var_index
+      call report_bmi_error(bmi_last_error)
+    end if
+
+  end subroutine index_to_address
+
+  !> @brief Get the memory path and name of the variable with the given index
+  !<
+  subroutine split_index(c_var_index, mem_path, var_name, success)
+    ! -- dummy variables
+    integer(c_int), intent(in) :: c_var_index !< index of the variable
+    character(len=LENMEMPATH), intent(out) :: mem_path !< memory path used by the memory manager
+    character(len=LENVARNAME), intent(out) :: var_name !< name of the variable
+    logical(LGP), intent(out) :: success !< false when invalid
+    ! -- local variables
+    character(len=LENMEMADDRESS) :: var_address
+    logical(LGP) :: valid, found
+
+    mem_path = ''
+    var_name = ''
+    call index_to_address(c_var_index, var_address, success)
+    if (.not. success) return
+
+    success = .false.
+    call split_mem_address(var_address, mem_path, var_name, valid)
+    if (.not. valid) then
+      write (bmi_last_error, fmt_invalid_var) trim(var_address)
+      call report_bmi_error(bmi_last_error)
+      return
+    end if
+
+    ! the variable may have been released since the index was assigned
+    call check_mem_address(mem_path, var_name, found)
+    if (.not. found) then
+      write (bmi_last_error, fmt_unknown_var) trim(var_name), trim(mem_path)
+      call report_bmi_error(bmi_last_error)
+      return
+    end if
+
+    success = .true.
+
+  end subroutine split_index
 
   !> @brief Split the variable address string
   !!

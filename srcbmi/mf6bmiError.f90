@@ -28,6 +28,8 @@ module mf6bmiError
   character(len=*), parameter :: fmt_unavailable_ext = & !< Extension not negotiated, args: extension name
                                  "('BMI Error, extension not supported or &
                                  &not requested at initialize: ', a)"
+  character(len=*), parameter :: fmt_invalid_index = & !< Invalid variable index, args: variable index
+                                 "('BMI Error, invalid variable index: ', i0)"
   character(len=*), parameter :: fmt_invalid_var = & !< Invalid variable address, args: variable address
                                  "('BMI Error, invalid address string: ', a)"
   character(len=*), parameter :: fmt_unsupported_rank = & !< Unsupported rank, args: variable name
