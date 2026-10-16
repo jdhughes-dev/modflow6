@@ -171,30 +171,30 @@ def api_func(exe, idx, model_ws=None):
     end_time = mf6.get_end_time()
 
     # maximum outer iterations
-    mxit_tag = mf6.get_var_address("MXITER", "SLN_1")
-    max_iter = mf6.get_value(mxit_tag)
+    mxit_tag = mf6.xmi.get_var_address("MXITER", "SLN_1")
+    max_iter = mf6.get_value(mf6.var_index(mxit_tag))
 
     # get copy of recharge array
-    rch_tag = mf6.get_var_address("RECHARGE", name, rch_pname)
-    new_recharge = mf6.get_value(rch_tag)
+    rch_tag = mf6.xmi.get_var_address("RECHARGE", name, rch_pname)
+    new_recharge = mf6.get_value(mf6.var_index(rch_tag))
 
     # model time loop
     idx = 0
     while current_time < end_time:
         # get dt and prepare for non-linear iterations
         dt = mf6.get_time_step()
-        mf6.prepare_time_step(dt)
+        mf6.xmi.prepare_time_step(dt)
 
         # convergence loop
         kiter = 0
-        mf6.prepare_solve()
+        mf6.xmi.prepare_solve()
 
         # update recharge
         new_recharge[:] = rch_spd[idx]
-        mf6.set_value(rch_tag, new_recharge)
+        mf6.set_value(mf6.var_index(rch_tag), new_recharge)
 
         while kiter < max_iter:
-            has_converged = mf6.solve()
+            has_converged = mf6.xmi.solve()
             kiter += 1
 
             if has_converged:
@@ -206,10 +206,10 @@ def api_func(exe, idx, model_ws=None):
             return False, open(output_file_path).readlines()
 
         # finalize time step
-        mf6.finalize_solve()
+        mf6.xmi.finalize_solve()
 
         # finalize time step and update time
-        mf6.finalize_time_step()
+        mf6.xmi.finalize_time_step()
         current_time = mf6.get_current_time()
 
         # increment counter

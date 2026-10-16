@@ -136,7 +136,7 @@ def api_func(exe, idx, model_ws=None):
 
     # testing API
     comp_str = mf6.get_component_name()
-    version_str = mf6.get_version()
+    version_str = mf6.xmi.get_version()
     print(f"Loaded {comp_str} with version {version_str}")
 
     # time loop

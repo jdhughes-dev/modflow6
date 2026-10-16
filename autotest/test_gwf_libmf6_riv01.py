@@ -169,12 +169,12 @@ def api_func(exe, idx, model_ws=None):
     end_time = mf6.get_end_time()
 
     # get copy of (multi-dim) array with river parameters
-    stage_tag = mf6.get_var_address("STAGE", name, riv_packname)
-    cond_tag = mf6.get_var_address("COND", name, riv_packname)
-    rbot_tag = mf6.get_var_address("RBOT", name, riv_packname)
-    new_stage = mf6.get_value(stage_tag)
-    new_cond = mf6.get_value(cond_tag)
-    new_rbot = mf6.get_value(rbot_tag)
+    stage_tag = mf6.xmi.get_var_address("STAGE", name, riv_packname)
+    cond_tag = mf6.xmi.get_var_address("COND", name, riv_packname)
+    rbot_tag = mf6.xmi.get_var_address("RBOT", name, riv_packname)
+    new_stage = mf6.get_value(mf6.var_index(stage_tag))
+    new_cond = mf6.get_value(mf6.var_index(cond_tag))
+    new_rbot = mf6.get_value(mf6.var_index(rbot_tag))
 
     # model time loop
     idx = 0
@@ -183,27 +183,27 @@ def api_func(exe, idx, model_ws=None):
         dt = mf6.get_time_step()
 
         # prepare... and reads the RIV data from file!
-        mf6.prepare_time_step(dt)
+        mf6.xmi.prepare_time_step(dt)
 
         # set the RIV data through the BMI
         # change cond and rbot data
         new_cond[:] = [riv_cond]
         new_rbot[:] = [riv_bot]
-        mf6.set_value(cond_tag, new_cond)
-        mf6.set_value(rbot_tag, new_rbot)
+        mf6.set_value(mf6.var_index(cond_tag), new_cond)
+        mf6.set_value(mf6.var_index(rbot_tag), new_rbot)
         # change stage data
         if current_time < 5:
             new_stage[:] = [riv_stage]
-            mf6.set_value(stage_tag, new_stage)
+            mf6.set_value(mf6.var_index(stage_tag), new_stage)
         else:
             new_stage[:] = [riv_stage2]
-            mf6.set_value(stage_tag, new_stage)
+            mf6.set_value(mf6.var_index(stage_tag), new_stage)
 
         kiter = 0
-        mf6.prepare_solve()
+        mf6.xmi.prepare_solve()
 
         while kiter < nouter:
-            has_converged = mf6.solve()
+            has_converged = mf6.xmi.solve()
             kiter += 1
 
             if has_converged:
@@ -215,10 +215,10 @@ def api_func(exe, idx, model_ws=None):
             return False, open(output_file_path).readlines()
 
         # finalize time step
-        mf6.finalize_solve()
+        mf6.xmi.finalize_solve()
 
         # finalize time step and update time
-        mf6.finalize_time_step()
+        mf6.xmi.finalize_time_step()
         current_time = mf6.get_current_time()
 
         # increment counter

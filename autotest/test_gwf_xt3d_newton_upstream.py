@@ -174,13 +174,13 @@ def residual_sweep(libmf6, ws):
 
     mf6 = ModflowApi(libmf6, working_directory=str(ws))
     mf6.initialize()
-    mf6.prepare_time_step(mf6.get_time_step())
-    mf6.prepare_solve()
-    xtag = mf6.get_var_address("X", "SLN_1")
-    atag = mf6.get_var_address("AMAT", "SLN_1")
-    btag = mf6.get_var_address("RHS", "SLN_1")
-    ia = mf6.get_value(mf6.get_var_address("IA", "SLN_1")) - 1
-    ja = mf6.get_value(mf6.get_var_address("JA", "SLN_1")) - 1
+    mf6.xmi.prepare_time_step(mf6.get_time_step())
+    mf6.xmi.prepare_solve()
+    xtag = mf6.xmi.get_var_address("X", "SLN_1")
+    atag = mf6.xmi.get_var_address("AMAT", "SLN_1")
+    btag = mf6.xmi.get_var_address("RHS", "SLN_1")
+    ia = mf6.get_value(mf6.var_index(mf6.xmi.get_var_address("IA", "SLN_1"))) - 1
+    ja = mf6.get_value(mf6.var_index(mf6.xmi.get_var_address("JA", "SLN_1"))) - 1
     nn = n_cell[1] * ncol + n_cell[2]
     mm = m_cell[1] * ncol + m_cell[2]
     base = boundary_heads().ravel()
@@ -190,18 +190,18 @@ def residual_sweep(libmf6, ws):
     for k, d in enumerate(deltas):
         x = base.copy()
         x[nn] = h_ref + d
-        mf6.set_value(xtag, x.copy())
+        mf6.set_value(mf6.var_index(xtag), x.copy())
         # solve() assembles A and b for the heads just set (the Newton
         # terms cancel in A x - b) and then overwrites x with the linear
         # solution, which is discarded
-        mf6.solve()
-        a = mf6.get_value(atag)
-        b = mf6.get_value(btag)
+        mf6.xmi.solve()
+        a = mf6.get_value(mf6.var_index(atag))
+        b = mf6.get_value(mf6.var_index(btag))
         for irow, icell in ((0, nn), (1, mm)):
             cols = ja[ia[icell] : ia[icell + 1]]
             res[k, irow] = a[ia[icell] : ia[icell + 1]] @ x[cols] - b[icell]
-    mf6.finalize_solve()
-    mf6.finalize_time_step()
+    mf6.xmi.finalize_solve()
+    mf6.xmi.finalize_time_step()
     mf6.finalize()
     return deltas, res
 
