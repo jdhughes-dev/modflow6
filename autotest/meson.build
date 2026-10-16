@@ -78,6 +78,9 @@ if test_drive.found() and not fc_id.contains('intel')
       'varset_count',
       'varset_members',
       'varset_unknown',
+      'var_index',
+      'var_index_unknown',
+      'var_index_across_run',
     ],
     'BmiXmi': [
       'negotiate',

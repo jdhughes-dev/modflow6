@@ -118,6 +118,7 @@ contains
     !
     ! -- initialize MODFLOW 6
     call Mf6Initialize()
+    call create_var_indices()
 
     ! -- from here on, pointers to stable variables must stay valid
     if (pointers_enabled) then
@@ -206,6 +207,7 @@ contains
     iforcestop = 0
     call mem_freeze_stable(.false.)
     call Mf6Finalize()
+    call clear_var_indices()
     xmi_enabled = .false.
     pointers_enabled = .false.
 
@@ -413,6 +415,35 @@ contains
 
   end function get_varset_members
 
+  !> @brief Get the index of a variable from its full address
+  !!
+  !! The index identifies the variable in every other variable function
+  !! and does not change from initialize to finalize.
+  !<
+  function get_var_index(c_var_address, c_var_index) result(bmi_status) &
+    bind(C, name="get_var_index")
+    !DIR$ ATTRIBUTES DLLEXPORT :: get_var_index
+    ! -- dummy variables
+    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(out) :: c_var_index !< index of the variable
+    integer(kind=c_int) :: bmi_status !< BMI status code
+    ! -- local variables
+    character(len=LENMEMPATH) :: mem_path
+    character(len=LENVARNAME) :: var_name
+    logical(LGP) :: valid
+
+    c_var_index = -1
+    call split_address(c_var_address, mem_path, var_name, valid)
+    if (.not. valid) then
+      bmi_status = BMI_FAILURE
+      return
+    end if
+
+    c_var_index = find_var_index(create_mem_address(mem_path, var_name))
+    bmi_status = BMI_SUCCESS
+
+  end function get_var_index
+
   !> @brief Return true if the variable set is known
   !!
   !! The 'bmi:pointers' sets are known only when that extension was
@@ -451,11 +482,11 @@ contains
 
   !> @brief Get the size (in bytes) of a single element of a variable
   !<
-  function get_var_itemsize(c_var_address, var_size) result(bmi_status) &
+  function get_var_itemsize(c_var_index, var_size) result(bmi_status) &
     bind(C, name="get_var_itemsize")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_var_itemsize
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     integer(kind=c_int), intent(out) :: var_size !< size of the element in bytes
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -465,7 +496,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -478,11 +509,11 @@ contains
 
   !> @brief Get size of the variable, in bytes
   !<
-  function get_var_nbytes(c_var_address, var_nbytes) result(bmi_status) &
+  function get_var_nbytes(c_var_index, var_nbytes) result(bmi_status) &
     bind(C, name="get_var_nbytes")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_var_nbytes
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     integer(kind=c_int), intent(out) :: var_nbytes !< size in bytes
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -493,7 +524,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -510,18 +541,18 @@ contains
 
   !> @brief Copy the double precision values of a variable into the array
   !!
-  !! The copied variable us located at @p c_var_address. The caller should
+  !! The copied variable us located at index @p c_var_index. The caller should
   !! provide @p c_arr_ptr pointing to an array of the proper shape (the
   !! BMI function get_var_shape() can be used to create it). Multi-dimensional
   !! arrays are supported.
   !<
-  function get_value_double(c_var_address, c_arr_ptr) result(bmi_status) &
+  function get_value_double(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="get_value_double")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_value_double
     ! -- modules
     use MemorySetHandlerModule, only: on_memory_set
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(in) :: c_arr_ptr !< pointer to the double precision array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -537,7 +568,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -587,18 +618,18 @@ contains
 
   !> @brief Copy the integer values of a variable into the array
   !!
-  !! The copied variable is located at @p c_var_address. The caller should
+  !! The copied variable is located at index @p c_var_index. The caller should
   !! provide @p c_arr_ptr pointing to an array of the proper shape (the
   !! BMI function get_var_shape() can be used to create it). Multi-dimensional
   !! arrays are supported.
   !<
-  function get_value_int(c_var_address, c_arr_ptr) result(bmi_status) &
+  function get_value_int(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="get_value_int")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_value_int
     ! -- modules
     use MemorySetHandlerModule, only: on_memory_set
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(in) :: c_arr_ptr !< pointer to the integer array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -614,7 +645,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -664,16 +695,16 @@ contains
 
   !> @brief Copy the logical scalar value into the array
   !!
-  !! The copied variable us located at @p c_var_address. The caller should
+  !! The copied variable us located at index @p c_var_index. The caller should
   !! provide @p c_arr_ptr pointing to a scalar array with rank=0.
   !<
-  function get_value_bool(c_var_address, c_arr_ptr) result(bmi_status) &
+  function get_value_bool(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="get_value_bool")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_value_bool
     ! -- modules
     use MemorySetHandlerModule, only: on_memory_set
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(in) :: c_arr_ptr !< pointer to the logical array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -685,7 +716,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -710,17 +741,17 @@ contains
 
   !> @brief Copy the string(s) of a variable into the array
   !!
-  !! The copied variable is located at @p c_var_address. The caller should
+  !! The copied variable is located at index @p c_var_index. The caller should
   !! provide @p c_arr_ptr pointing to an array of the proper shape (the
   !! BMI function get_var_shape() can be used to create it). For strings
   !! currently scalars and 1d arrays (of CharacterStringType) are
   !< supported
-  function get_value_string(c_var_address, c_arr_ptr) result(bmi_status) &
+  function get_value_string(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="get_value_string")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_value_string
     ! -- modules
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(in) :: c_arr_ptr !< pointer to the string array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -737,7 +768,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -789,18 +820,18 @@ contains
 
   !> @brief Copy the value of a variable into the array
   !!
-  !! The copied variable is located at @p c_var_address. The caller should
+  !! The copied variable is located at index @p c_var_index. The caller should
   !! provide @p c_arr_ptr pointing to an array of the proper shape (the
   !! BMI function get_var_shape() can be used to create it). Multi-dimensional
   !! arrays are supported.
   !<
-  function get_value(c_var_address, c_arr_ptr) result(bmi_status) &
+  function get_value(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="get_value")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_value
     ! -- modules
     use ConstantsModule, only: LENMEMTYPE
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(inout) :: c_arr_ptr !< pointer to the array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -811,7 +842,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -820,13 +851,13 @@ contains
     call get_mem_type(var_name, mem_path, mem_type)
 
     if (index(mem_type, "DOUBLE") /= 0) then
-      bmi_status = get_value_double(c_var_address, c_arr_ptr)
+      bmi_status = get_value_double(c_var_index, c_arr_ptr)
     else if (index(mem_type, "INTEGER") /= 0) then
-      bmi_status = get_value_int(c_var_address, c_arr_ptr)
+      bmi_status = get_value_int(c_var_index, c_arr_ptr)
     else if (index(mem_type, "LOGICAL") /= 0) then
-      bmi_status = get_value_bool(c_var_address, c_arr_ptr)
+      bmi_status = get_value_bool(c_var_index, c_arr_ptr)
     else if (index(mem_type, "STRING") /= 0) then
-      bmi_status = get_value_string(c_var_address, c_arr_ptr)
+      bmi_status = get_value_string(c_var_index, c_arr_ptr)
     else
       write (bmi_last_error, fmt_unsupported_type) trim(var_name)
       call report_bmi_error(bmi_last_error)
@@ -838,17 +869,17 @@ contains
 
   !> @brief Get a pointer to an array
   !!
-  !! The array is located at @p c_var_address. There is no copying of data involved.
+  !! The array is located at index @p c_var_index. There is no copying of data involved.
   !! Multi-dimensional arrays are supported and the get_var_rank() function
   !! can be used to get the variable's dimensionality, and get_var_shape() for
   !! its shape.
   !<
-  function get_value_ptr(c_var_address, c_arr_ptr) result(bmi_status) &
+  function get_value_ptr(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="")
     ! -- modules
     use ConstantsModule, only: LENMEMTYPE
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(inout) :: c_arr_ptr !< pointer to the array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -859,7 +890,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -868,11 +899,11 @@ contains
     call get_mem_type(var_name, mem_path, mem_type)
 
     if (index(mem_type, "DOUBLE") /= 0) then
-      bmi_status = get_value_ptr_double(c_var_address, c_arr_ptr)
+      bmi_status = get_value_ptr_double(c_var_index, c_arr_ptr)
     else if (index(mem_type, "INTEGER") /= 0) then
-      bmi_status = get_value_ptr_int(c_var_address, c_arr_ptr)
+      bmi_status = get_value_ptr_int(c_var_index, c_arr_ptr)
     else if (index(mem_type, "LOGICAL") /= 0) then
-      bmi_status = get_value_ptr_bool(c_var_address, c_arr_ptr)
+      bmi_status = get_value_ptr_bool(c_var_index, c_arr_ptr)
     else
       write (bmi_last_error, fmt_unsupported_type) trim(var_name)
       call report_bmi_error(bmi_last_error)
@@ -884,15 +915,15 @@ contains
 
   !> @brief Get a pointer to the array of double precision numbers
   !!
-  !! The array is located at @p c_var_address. There is no copying of data involved.
+  !! The array is located at index @p c_var_index. There is no copying of data involved.
   !! Multi-dimensional arrays are supported and the get_var_rank() function
   !! can be used to get the variable's dimensionality, and get_var_shape() for
   !! its shape.
   !<
-  function get_value_ptr_double(c_var_address, c_arr_ptr) result(bmi_status) &
+  function get_value_ptr_double(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="")
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(inout) :: c_arr_ptr !< pointer to the array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -907,7 +938,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -938,14 +969,14 @@ contains
 
   !> @brief Get a pointer to the array of integer numbers
   !!
-  !! The array is located at @p c_var_address. There is no copying of data involved.
+  !! The array is located at index @p c_var_index. There is no copying of data involved.
   !! Multi-dimensional arrays are supported and the get_var_rank() function
   !! can be used to get the variable's dimensionality.
   !<
-  function get_value_ptr_int(c_var_address, c_arr_ptr) result(bmi_status) &
+  function get_value_ptr_int(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="")
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(inout) :: c_arr_ptr !< pointer to the array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -960,7 +991,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -994,10 +1025,10 @@ contains
   !!
   !! Only scalar values (with rank=0) are supported.
   !<
-  function get_value_ptr_bool(c_var_address, c_arr_ptr) result(bmi_status) &
+  function get_value_ptr_bool(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="")
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(inout) :: c_arr_ptr !< pointer to the array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -1009,7 +1040,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -1035,13 +1066,13 @@ contains
   !! and should have a C-style layout, which is particularly important for
   !! rank > 1.
   !<
-  function set_value(c_var_address, c_arr_ptr) result(bmi_status) &
+  function set_value(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="set_value")
     !DIR$ ATTRIBUTES DLLEXPORT :: set_value
     ! -- modules
     use ConstantsModule, only: LENMEMTYPE
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(inout) :: c_arr_ptr !< pointer to the array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -1052,7 +1083,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -1061,11 +1092,11 @@ contains
     call get_mem_type(var_name, mem_path, mem_type)
 
     if (index(mem_type, "DOUBLE") /= 0) then
-      bmi_status = set_value_double(c_var_address, c_arr_ptr)
+      bmi_status = set_value_double(c_var_index, c_arr_ptr)
     else if (index(mem_type, "INTEGER") /= 0) then
-      bmi_status = set_value_int(c_var_address, c_arr_ptr)
+      bmi_status = set_value_int(c_var_index, c_arr_ptr)
     else if (index(mem_type, "LOGICAL") /= 0) then
-      bmi_status = set_value_bool(c_var_address, c_arr_ptr)
+      bmi_status = set_value_bool(c_var_index, c_arr_ptr)
     else
       write (bmi_last_error, fmt_unsupported_type) trim(var_name)
       call report_bmi_error(bmi_last_error)
@@ -1081,13 +1112,13 @@ contains
   !! and should have a C-style layout, which is particularly important for
   !! rank > 1.
   !<
-  function set_value_double(c_var_address, c_arr_ptr) result(bmi_status) &
+  function set_value_double(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="set_value_double")
     !DIR$ ATTRIBUTES DLLEXPORT :: set_value_double
     ! -- modules
     use MemorySetHandlerModule, only: on_memory_set
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(in) :: c_arr_ptr !< pointer to the double precision array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -1103,7 +1134,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -1154,13 +1185,13 @@ contains
   !!
   !! The array pointed to by @p c_arr_ptr can have rank equal to 0, 1, or 2.
   !<
-  function set_value_int(c_var_address, c_arr_ptr) result(bmi_status) &
+  function set_value_int(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="set_value_int")
     !DIR$ ATTRIBUTES DLLEXPORT :: set_value_int
     ! -- modules
     use MemorySetHandlerModule, only: on_memory_set
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(in) :: c_arr_ptr !< pointer to the integer array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -1176,7 +1207,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -1227,13 +1258,13 @@ contains
   !!
   !! The array pointed to by @p c_arr_ptr must have a rank equal to 0.
   !<
-  function set_value_bool(c_var_address, c_arr_ptr) result(bmi_status) &
+  function set_value_bool(c_var_index, c_arr_ptr) result(bmi_status) &
     bind(C, name="set_value_bool")
     !DIR$ ATTRIBUTES DLLEXPORT :: set_value_bool
     ! -- modules
     use MemorySetHandlerModule, only: on_memory_set
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(in) :: c_arr_ptr !< pointer to the logical array
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -1246,7 +1277,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -1286,13 +1317,13 @@ contains
   !! The caller should provide @p c_arr_ptr pointing to an array of size
   !! @p count. Double precision and integer variables are supported.
   !<
-  function get_value_at_indices(c_var_address, c_arr_ptr, c_inds, count) &
+  function get_value_at_indices(c_var_index, c_arr_ptr, c_inds, count) &
     result(bmi_status) bind(C, name="get_value_at_indices")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_value_at_indices
     ! -- modules
     use ConstantsModule, only: LENMEMTYPE
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     type(c_ptr), intent(in) :: c_arr_ptr !< pointer to the array to copy into
     integer(kind=c_int), intent(in) :: c_inds(*) !< zero-based indices of the values
     integer(kind=c_int), intent(in) :: count !< number of indices
@@ -1309,21 +1340,21 @@ contains
 
     bmi_status = BMI_FAILURE
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) return
     if (.not. valid_indices(mem_path, var_name, c_inds, count, nvalues)) return
 
     ! -- the variable's storage, viewed as a flat array in memory order
     call get_mem_type(var_name, mem_path, mem_type)
     if (index(mem_type, "DOUBLE") /= 0) then
-      if (get_value_ptr_double(c_var_address, var_ptr) /= BMI_SUCCESS) return
+      if (get_value_ptr_double(c_var_index, var_ptr) /= BMI_SUCCESS) return
       call c_f_pointer(var_ptr, src_dbl, [nvalues])
       call c_f_pointer(c_arr_ptr, tgt_dbl, [count])
       do i = 1, count
         tgt_dbl(i) = src_dbl(c_inds(i) + 1)
       end do
     else if (index(mem_type, "INTEGER") /= 0) then
-      if (get_value_ptr_int(c_var_address, var_ptr) /= BMI_SUCCESS) return
+      if (get_value_ptr_int(c_var_index, var_ptr) /= BMI_SUCCESS) return
       call c_f_pointer(var_ptr, src_int, [nvalues])
       call c_f_pointer(c_arr_ptr, tgt_int, [count])
       do i = 1, count
@@ -1347,14 +1378,14 @@ contains
   !! variables are supported. A new hydraulic conductivity does not change
   !! the saturated conductance until NPF recalculates it, as it does for TVK.
   !<
-  function set_value_at_indices(c_var_address, c_inds, count, c_arr_ptr) &
+  function set_value_at_indices(c_var_index, c_inds, count, c_arr_ptr) &
     result(bmi_status) bind(C, name="set_value_at_indices")
     !DIR$ ATTRIBUTES DLLEXPORT :: set_value_at_indices
     ! -- modules
     use ConstantsModule, only: LENMEMTYPE
     use MemorySetHandlerModule, only: on_memory_set
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     integer(kind=c_int), intent(in) :: c_inds(*) !< zero-based indices of the values
     integer(kind=c_int), intent(in) :: count !< number of indices
     type(c_ptr), intent(in) :: c_arr_ptr !< pointer to the array with the new values
@@ -1371,21 +1402,21 @@ contains
 
     bmi_status = BMI_FAILURE
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) return
     if (.not. valid_indices(mem_path, var_name, c_inds, count, nvalues)) return
 
     ! -- the variable's storage, viewed as a flat array in memory order
     call get_mem_type(var_name, mem_path, mem_type)
     if (index(mem_type, "DOUBLE") /= 0) then
-      if (get_value_ptr_double(c_var_address, var_ptr) /= BMI_SUCCESS) return
+      if (get_value_ptr_double(c_var_index, var_ptr) /= BMI_SUCCESS) return
       call c_f_pointer(var_ptr, tgt_dbl, [nvalues])
       call c_f_pointer(c_arr_ptr, src_dbl, [count])
       do i = 1, count
         tgt_dbl(c_inds(i) + 1) = src_dbl(i)
       end do
     else if (index(mem_type, "INTEGER") /= 0) then
-      if (get_value_ptr_int(c_var_address, var_ptr) /= BMI_SUCCESS) return
+      if (get_value_ptr_int(c_var_index, var_ptr) /= BMI_SUCCESS) return
       call c_f_pointer(var_ptr, tgt_int, [nvalues])
       call c_f_pointer(c_arr_ptr, src_int, [count])
       do i = 1, count
@@ -1449,13 +1480,13 @@ contains
   !! The type returned is that of a single element.
   !! When the variable cannot be found, the string
   !< 'UNKNOWN' is assigned.
-  function get_var_type(c_var_address, c_var_type) result(bmi_status) &
+  function get_var_type(c_var_index, c_var_type) result(bmi_status) &
     bind(C, name="get_var_type")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_var_type
     ! -- modules
     use ConstantsModule, only: LENMEMTYPE
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     character(kind=c_char), intent(out) :: c_var_type(BMI_LENVARTYPE) !< variable type as a string
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -1466,7 +1497,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -1489,11 +1520,11 @@ contains
   !! The memory manager does not store units, so 'unknown' is returned for
   !! every variable.
   !<
-  function get_var_units(c_var_address, c_var_units) result(bmi_status) &
+  function get_var_units(c_var_index, c_var_units) result(bmi_status) &
     bind(C, name="get_var_units")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_var_units
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     character(kind=c_char), intent(out) :: c_var_units(BMI_LENUNITS) !< variable units as a string
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -1504,7 +1535,7 @@ contains
 
     bmi_status = BMI_FAILURE
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) return
 
     c_var_units(1:len(var_units) + 1) = &
@@ -1517,11 +1548,11 @@ contains
   !!
   !! Every variable is reported at the grid nodes.
   !<
-  function get_var_location(c_var_address, c_var_location) result(bmi_status) &
+  function get_var_location(c_var_index, c_var_location) result(bmi_status) &
     bind(C, name="get_var_location")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_var_location
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     character(kind=c_char), intent(out) :: c_var_location(BMI_LENVARLOCATION) !< variable location as a string
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -1532,7 +1563,7 @@ contains
 
     bmi_status = BMI_FAILURE
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) return
 
     c_var_location(1:len(var_location) + 1) = &
@@ -1546,10 +1577,10 @@ contains
   !! In order to support multi-dimensional arrays, this function gives
   !! access to the rank of the array.
   !<
-  function get_var_rank(c_var_address, c_var_rank) result(bmi_status) &
+  function get_var_rank(c_var_index, c_var_rank) result(bmi_status) &
     bind(C, name="")
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     integer(kind=c_int), intent(out) :: c_var_rank !< variable rank
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -1559,7 +1590,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
@@ -1583,12 +1614,12 @@ contains
   !! Note that the returned shape representation will has been converted
   !! to C-style.
   !<
-  function get_var_shape(c_var_address, c_var_shape) result(bmi_status) &
+  function get_var_shape(c_var_index, c_var_shape) result(bmi_status) &
     bind(C, name="")
     ! -- modules
     use ConstantsModule, only: MAXMEMRANK
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*) !< memory address string of the variable
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     integer(c_int), intent(inout) :: c_var_shape(*) !< 1D array with the variable's shape
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -1600,7 +1631,7 @@ contains
 
     bmi_status = BMI_SUCCESS
 
-    call split_address(c_var_address, mem_path, var_name, valid)
+    call split_index(c_var_index, mem_path, var_name, valid)
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return

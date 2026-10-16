@@ -17,7 +17,7 @@ module TestBmi
                     get_end_time, get_time_units, get_var_units, &
                     get_var_location, get_value, get_value_at_indices, &
                     set_value_at_indices
-  use BmiTestUtils, only: init
+  use BmiTestUtils, only: init, var_index
   implicit none
   private
   public :: collect_bmi, c_string, f_string
@@ -75,17 +75,17 @@ contains
                  "time units '"//f_string(c_units)//"', expected 'd'")
       if (allocated(error)) exit run
 
-      call check(error, get_var_units(c_string('LEFTMODEL/X'), c_units) &
+      call check(error, get_var_units(var_index('LEFTMODEL/X'), c_units) &
                  == BMI_SUCCESS, "get_var_units")
       if (allocated(error)) exit run
       call check(error, f_string(c_units) == 'unknown', "variable units")
       if (allocated(error)) exit run
-      call check(error, get_var_location(c_string('LEFTMODEL/X'), c_location) &
+      call check(error, get_var_location(var_index('LEFTMODEL/X'), c_location) &
                  == BMI_SUCCESS, "get_var_location")
       if (allocated(error)) exit run
       call check(error, f_string(c_location) == 'node', "variable location")
       if (allocated(error)) exit run
-      call check(error, get_var_units(c_string('LEFTMODEL/NOPE'), c_units) &
+      call check(error, get_var_units(var_index('LEFTMODEL/NOPE'), c_units) &
                  == BMI_FAILURE, "get_var_units of an unknown variable")
       if (allocated(error)) exit run
 
@@ -112,11 +112,11 @@ contains
 
       ! -- a rank-1 double precision variable
       ptr = c_loc(x)
-      call check(error, get_value(c_string('LEFTMODEL/X'), ptr) &
+      call check(error, get_value(var_index('LEFTMODEL/X'), ptr) &
                  == BMI_SUCCESS, "get_value of X")
       if (allocated(error)) exit run
       inds = [4, 0, 2]
-      call check(error, get_value_at_indices(c_string('LEFTMODEL/X'), &
+      call check(error, get_value_at_indices(var_index('LEFTMODEL/X'), &
                                              c_loc(vals), inds, 3) &
                  == BMI_SUCCESS, "get_value_at_indices of X")
       if (allocated(error)) exit run
@@ -128,11 +128,11 @@ contains
 
       ! -- a rank-2 variable, Fortran shape (3, 5), indexed in C order
       ptr = c_loc(spdis)
-      call check(error, get_value(c_string('LEFTMODEL/NPF/SPDIS'), ptr) &
+      call check(error, get_value(var_index('LEFTMODEL/NPF/SPDIS'), ptr) &
                  == BMI_SUCCESS, "get_value of SPDIS")
       if (allocated(error)) exit run
       inds = [14, 7, 0]
-      call check(error, get_value_at_indices(c_string('LEFTMODEL/NPF/SPDIS'), &
+      call check(error, get_value_at_indices(var_index('LEFTMODEL/NPF/SPDIS'), &
                                              c_loc(vals), inds, 3) &
                  == BMI_SUCCESS, "get_value_at_indices of SPDIS")
       if (allocated(error)) exit run
@@ -144,7 +144,7 @@ contains
 
       ! -- an integer variable: the model shape is (1, 1, 5)
       inds(1) = 2
-      call check(error, get_value_at_indices(c_string('LEFTMODEL/DIS/MSHAPE'), &
+      call check(error, get_value_at_indices(var_index('LEFTMODEL/DIS/MSHAPE'), &
                                              c_loc(int_vals), inds, 1) &
                  == BMI_SUCCESS, "get_value_at_indices of MSHAPE")
       if (allocated(error)) exit run
@@ -153,7 +153,7 @@ contains
 
       ! -- an index past the end of the variable
       inds(1) = 5
-      call check(error, get_value_at_indices(c_string('LEFTMODEL/X'), &
+      call check(error, get_value_at_indices(var_index('LEFTMODEL/X'), &
                                              c_loc(vals), inds, 1) &
                  == BMI_FAILURE, "get_value_at_indices out of range")
       if (allocated(error)) exit run
@@ -161,12 +161,12 @@ contains
       ! -- set two of the five horizontal hydraulic conductivities
       inds(1:2) = [1, 3]
       new_k = [2.0_DP, 3.0_DP]
-      call check(error, set_value_at_indices(c_string('LEFTMODEL/NPF/K11'), &
+      call check(error, set_value_at_indices(var_index('LEFTMODEL/NPF/K11'), &
                                              inds, 2, c_loc(new_k)) &
                  == BMI_SUCCESS, "set_value_at_indices of K11")
       if (allocated(error)) exit run
       ptr = c_loc(k)
-      call check(error, get_value(c_string('LEFTMODEL/NPF/K11'), ptr) &
+      call check(error, get_value(var_index('LEFTMODEL/NPF/K11'), ptr) &
                  == BMI_SUCCESS, "get_value of K11")
       if (allocated(error)) exit run
       do i = 1, 5

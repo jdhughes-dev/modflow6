@@ -14,7 +14,7 @@ module TestXmi
   use mf6bmiError, only: BMI_SUCCESS
   use mf6bmi, only: bmi_finalize, get_current_time, get_time_step, &
                     get_value_at_indices
-  use BmiTestUtils, only: init
+  use BmiTestUtils, only: init, var_index
   use mf6xmi, only: xmi_get_version, get_var_address, &
                     xmi_get_subcomponent_count, xmi_prepare_time_step, &
                     xmi_prepare_solve, xmi_solve, xmi_finalize_solve, &
@@ -106,14 +106,14 @@ contains
 
       ! -- the constant heads hold the two ends of the section
       inds(1) = 0
-      call check(error, get_value_at_indices(c_string('LEFTMODEL/X'), &
+      call check(error, get_value_at_indices(var_index('LEFTMODEL/X'), &
                                              c_loc(head), inds, 1) &
                  == BMI_SUCCESS, "get_value_at_indices of the left head")
       if (allocated(error)) exit run
       call check(error, head(1) == 1.0_DP, "head at the left end")
       if (allocated(error)) exit run
       inds(1) = 4
-      call check(error, get_value_at_indices(c_string('RIGHTMODEL/X'), &
+      call check(error, get_value_at_indices(var_index('RIGHTMODEL/X'), &
                                              c_loc(head), inds, 1) &
                  == BMI_SUCCESS, "get_value_at_indices of the right head")
       if (allocated(error)) exit run

@@ -14,31 +14,31 @@ module TestBmiPointers
                     get_varset_member_count, get_varset_members
   use mf6bmiExtension, only: bmi_get_extension, PointersTableType, &
                              POINTERS_TABLE_VERSION
-  use BmiTestUtils, only: to_c, init, has_member
+  use BmiTestUtils, only: to_c, init, has_member, var_index
 
   implicit none
   private
   public :: collect_bmipointers
 
   abstract interface
-    function get_value_ptr_fn(c_var_address, c_arr_ptr) result(bmi_status) &
+    function get_value_ptr_fn(c_var_index, c_arr_ptr) result(bmi_status) &
       bind(C)
       import :: c_char, c_ptr, c_int
-      character(kind=c_char), intent(in) :: c_var_address(*)
+      integer(c_int), intent(in) :: c_var_index
       type(c_ptr), intent(inout) :: c_arr_ptr
       integer(c_int) :: bmi_status
     end function get_value_ptr_fn
-    function get_var_rank_fn(c_var_address, c_var_rank) result(bmi_status) &
+    function get_var_rank_fn(c_var_index, c_var_rank) result(bmi_status) &
       bind(C)
       import :: c_char, c_int
-      character(kind=c_char), intent(in) :: c_var_address(*)
+      integer(c_int), intent(in) :: c_var_index
       integer(c_int), intent(out) :: c_var_rank
       integer(c_int) :: bmi_status
     end function get_var_rank_fn
-    function get_var_shape_fn(c_var_address, c_var_shape) result(bmi_status) &
+    function get_var_shape_fn(c_var_index, c_var_shape) result(bmi_status) &
       bind(C)
       import :: c_char, c_int
-      character(kind=c_char), intent(in) :: c_var_address(*)
+      integer(c_int), intent(in) :: c_var_index
       integer(c_int), intent(inout) :: c_var_shape(*)
       integer(c_int) :: bmi_status
     end function get_var_shape_fn
@@ -99,12 +99,12 @@ contains
     call c_f_procpointer(table%get_value_ptr, get_value_ptr)
     call c_f_procpointer(table%get_var_rank, get_var_rank)
     call c_f_procpointer(table%get_var_shape, get_var_shape)
-    call check(error, get_var_rank(to_c(address), rank) == BMI_SUCCESS)
+    call check(error, get_var_rank(var_index(address), rank) == BMI_SUCCESS)
     if (allocated(error)) return
     call check(error, rank == 1)
     call check(error, &
-               get_var_shape(to_c(address), var_shape) == BMI_SUCCESS)
-    call check(error, get_value_ptr(to_c(address), c_arr) == BMI_SUCCESS)
+               get_var_shape(var_index(address), var_shape) == BMI_SUCCESS)
+    call check(error, get_value_ptr(var_index(address), c_arr) == BMI_SUCCESS)
     if (allocated(error)) return
     call c_f_pointer(c_arr, values, var_shape)
   end subroutine table_ptr_dbl1d
@@ -120,13 +120,13 @@ contains
     integer(c_int) :: nbytes
     integer :: i
 
-    call check(error, get_var_nbytes(to_c(address), nbytes) == BMI_SUCCESS)
+    call check(error, get_var_nbytes(var_index(address), nbytes) == BMI_SUCCESS)
     if (allocated(error)) return
     allocate (copy(nbytes / 8))
     call check(error, size(copy) == size(values))
     if (allocated(error)) return
     c_copy = c_loc(copy)
-    call check(error, get_value(to_c(address), c_copy) == BMI_SUCCESS)
+    call check(error, get_value(var_index(address), c_copy) == BMI_SUCCESS)
     if (allocated(error)) return
     do i = 1, size(copy)
       call check(error, copy(i) == values(i))

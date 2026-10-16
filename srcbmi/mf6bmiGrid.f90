@@ -18,19 +18,19 @@ module mf6bmiGrid
 contains
 
   ! Get the grid identifier for the given variable.
-  function get_var_grid(c_var_address, var_grid) result(bmi_status) &
+  function get_var_grid(c_var_index, var_grid) result(bmi_status) &
     bind(C, name="get_var_grid")
     !DIR$ ATTRIBUTES DLLEXPORT :: get_var_grid
     ! -- modules
     use ListsModule, only: basemodellist
     use BaseModelModule, only: BaseModelType, GetBaseModelFromList
     ! -- dummy variables
-    character(kind=c_char), intent(in) :: c_var_address(*)
+    integer(kind=c_int), intent(in) :: c_var_index !< index of the variable, from get_var_index()
     integer(kind=c_int), intent(out) :: var_grid
     integer(kind=c_int) :: bmi_status
     ! -- local variables
     character(len=LENMODELNAME) :: model_name
-    character(len=LENMEMPATH) :: var_address
+    character(len=LENMEMADDRESS) :: var_address
     integer(I4B) :: i
     logical(LGP) :: success
     class(BaseModelType), pointer :: baseModel
@@ -38,8 +38,10 @@ contains
     var_grid = -1
 
     bmi_status = BMI_FAILURE
-    var_address = char_array_to_string(c_var_address, &
-                                       strlen(c_var_address, LENMEMADDRESS + 1))
+    call index_to_address(c_var_index, var_address, success)
+    if (.not. success) then
+      return
+    end if
     model_name = extract_model_name(var_address, success)
     if (.not. success) then
       ! we failed

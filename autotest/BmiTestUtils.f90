@@ -4,11 +4,11 @@ module BmiTestUtils
   use iso_c_binding, only: c_char, c_int, c_null_char
   use mf6bmiUtil, only: BMI_LENVARADDRESS, BMI_LENEXTENSIONNAME, strlen, &
                         char_array_to_string
-  use mf6bmi, only: bmi_initialize
+  use mf6bmi, only: bmi_initialize, get_var_index
 
   implicit none
   private
-  public :: to_string, to_c, has_member, init
+  public :: to_string, to_c, has_member, init, var_index
 
 contains
 
@@ -95,5 +95,14 @@ contains
       end do
     end if
   end function init
+
+  !> @brief Get the index of the variable at the address, or -1
+  !<
+  function var_index(address) result(idx)
+    character(len=*), intent(in) :: address
+    integer(c_int) :: idx
+
+    if (get_var_index(to_c(address), idx) /= 0) idx = -1
+  end function var_index
 
 end module BmiTestUtils
