@@ -50,6 +50,7 @@
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
 		<File RelativePath="..\srcbmi\mf6bmi.f90"/>
 		<File RelativePath="..\srcbmi\mf6bmiError.f90"/>
+		<File RelativePath="..\srcbmi\mf6bmiExtension.f90"/>
 		<File RelativePath="..\srcbmi\mf6bmiGrid.f90"/>
 		<File RelativePath="..\srcbmi\mf6bmiUtil.f90"/>
 		<File RelativePath="..\srcbmi\mf6xmi.F90">

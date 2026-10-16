@@ -35,6 +35,7 @@ if test_drive.found() and not fc_id.contains('intel')
     'tester_utils.f90',
     'TestBmi.f90',
     'TestXmi.f90',
+    'BmiTestUtils.f90',
   )
   test_srcs += bmi_sources
   foreach t : tests
@@ -73,13 +74,21 @@ if test_drive.found() and not fc_id.contains('intel')
       'bmi_version',
       'component_name',
       'lifecycle',
+      'config_file',
       'varset_count',
       'varset_members',
       'varset_unknown',
     ],
+    'BmiXmi': [
+      'negotiate',
+      'not_requested',
+      'unknown',
+      'table',
+      'time_loop',
+    ],
   }
 
-  bmi_test_srcs = files('bmitester.f90')
+  bmi_test_srcs = files('bmitester.f90', 'BmiTestUtils.f90')
   foreach suite, names : bmi_tests
     bmi_test_srcs += files('Test@0@.f90'.format(suite))
   endforeach

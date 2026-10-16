@@ -1,5 +1,8 @@
 !> @brief This module contains the eXtended Model Interface
 !!
+!! The XMI is the BMI extension 'xmi': request it at initialize() and call
+!! these functions through the table returned by get_extension('xmi').
+!!
 !! In this module we expose functionality in the MODFLOW 6 shared library,
 !! that is _beyond_ the basic model interface: https://bmi-spec.readthedocs.io/en/latest/.
 !! The main extensions are
@@ -98,13 +101,19 @@ module mf6xmi
 contains
 
 #if defined(__WITH_MPI__)
-  function xmi_initialize_mpi(mpi_comm) result(bmi_status) &
+  function xmi_initialize_mpi(mpi_comm, c_config, n_requested, c_requested, &
+                              n_supported, c_supported) result(bmi_status) &
     bind(C, name="initialize_mpi")
     use MpiWorldModule
     use SimVariablesModule, only: simulation_mode
     !DIR$ ATTRIBUTES DLLEXPORT :: xmi_initialize_mpi
     ! -- dummy variables
     integer(kind=c_int) :: mpi_comm !< the Fortran communicator (as an integer)
+    character(kind=c_char), intent(in) :: c_config(*) !< simulation name file, or empty
+    integer(kind=c_int), intent(in) :: n_requested !< number of requested extensions
+    character(kind=c_char), intent(in) :: c_requested(*) !< requested extension names
+    integer(kind=c_int), intent(out) :: n_supported !< number of supported extensions
+    character(kind=c_char), intent(inout) :: c_supported(*) !< supported extension names
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
     type(MpiWorldType), pointer :: mpi_world => null()
@@ -115,7 +124,8 @@ contains
     simulation_mode = 'PARALLEL'
 
     ! regular initialize
-    bmi_status = bmi_initialize()
+    bmi_status = bmi_initialize(c_config, n_requested, c_requested, &
+                                n_supported, c_supported)
 
   end function xmi_initialize_mpi
 #endif
@@ -127,8 +137,7 @@ contains
   !! here.
   !<
   function xmi_prepare_time_step(dt) result(bmi_status) &
-    bind(C, name="prepare_time_step")
-    !DIR$ ATTRIBUTES DLLEXPORT :: xmi_prepare_time_step
+    bind(C, name="")
     ! -- dummy variables
     real(kind=c_double), intent(in) :: dt !< time step
     integer(kind=c_int) :: bmi_status !< BMI status code
@@ -143,8 +152,7 @@ contains
   !! It does so by looping over all solution groups, and calling
   !! the calculate function on all solutions in there.
   !<
-  function xmi_do_time_step() result(bmi_status) bind(C, name="do_time_step")
-    !DIR$ ATTRIBUTES DLLEXPORT :: xmi_do_time_step
+  function xmi_do_time_step() result(bmi_status) bind(C, name="")
     ! -- dummy variables
     integer(kind=c_int) :: bmi_status !< BMI status code
 
@@ -159,8 +167,7 @@ contains
   !! to call this to finish the time step.
   !<
   function xmi_finalize_time_step() result(bmi_status) &
-    bind(C, name="finalize_time_step")
-    !DIR$ ATTRIBUTES DLLEXPORT :: xmi_finalize_time_step
+    bind(C, name="")
     ! -- dummy variables
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
@@ -185,8 +192,7 @@ contains
   !! you are most likely not using more than one...)
   !<
   function xmi_get_subcomponent_count(count) result(bmi_status) &
-    bind(C, name="get_subcomponent_count")
-    !DIR$ ATTRIBUTES DLLEXPORT :: xmi_get_subcomponent_count
+    bind(C, name="")
     ! -- modules
     use ListsModule, only: solutiongrouplist
     use SimVariablesModule, only: istdout
@@ -218,8 +224,7 @@ contains
   !! by xmi_get_subcomponent_count().
   !<
   function xmi_prepare_solve(subcomponent_idx) result(bmi_status) &
-    bind(C, name="prepare_solve")
-    !DIR$ ATTRIBUTES DLLEXPORT :: xmi_prepare_solve
+    bind(C, name="")
     ! -- modules
     use ListsModule, only: solutiongrouplist
     use BaseSolutionModule, only: BaseSolutionType
@@ -259,8 +264,7 @@ contains
   !! this, a matching call to xmi_prepare_solve() should be done.
   !<
   function xmi_solve(subcomponent_idx, has_converged) result(bmi_status) &
-    bind(C, name="solve")
-    !DIR$ ATTRIBUTES DLLEXPORT :: xmi_solve
+    bind(C, name="")
     ! -- modules
     use BaseSolutionModule, only: BaseSolutionType
     use NumericalSolutionModule, only: NumericalSolutionType
@@ -304,8 +308,7 @@ contains
   !! @return      bmi_status          the BMI status code
   !<
   function xmi_finalize_solve(subcomponent_idx) result(bmi_status) &
-    bind(C, name="finalize_solve")
-    !DIR$ ATTRIBUTES DLLEXPORT :: xmi_finalize_solve
+    bind(C, name="")
     ! -- modules
     use BaseSolutionModule, only: BaseSolutionType
     ! -- dummy variables
@@ -342,8 +345,7 @@ contains
   !> @brief Get the version string for this component
   !<
   function xmi_get_version(mf_version) result(bmi_status) &
-    bind(C, name="get_version")
-    !DIR$ ATTRIBUTES DLLEXPORT :: xmi_get_version
+    bind(C, name="")
     ! -- modules
     use VersionModule, only: VERSIONNUMBER, IDEVELOPMODE
     ! -- dummy variables
@@ -365,8 +367,7 @@ contains
   !<
   function get_var_address(c_component_name, c_subcomponent_name, &
                            c_var_name, c_var_address) &
-    result(bmi_status) bind(C, name="get_var_address")
-    !DIR$ ATTRIBUTES DLLEXPORT :: get_var_address
+    result(bmi_status) bind(C, name="")
     ! -- modules
     use MemoryHelperModule, only: create_mem_path, create_mem_address
     use ConstantsModule, only: LENCOMPONENTNAME, LENVARNAME, LENMEMPATH, &

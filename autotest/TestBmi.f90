@@ -13,10 +13,11 @@ module TestBmi
   use mf6bmiError, only: BMI_SUCCESS, BMI_FAILURE
   use mf6bmiUtil, only: LENUNITS, LENVARLOCATION, string_to_char_array, &
                         char_array_to_string, strlen
-  use mf6bmi, only: bmi_initialize, bmi_update_until, bmi_finalize, &
-                    get_current_time, get_end_time, get_time_units, &
-                    get_var_units, get_var_location, get_value, &
-                    get_value_at_indices, set_value_at_indices
+  use mf6bmi, only: bmi_update_until, bmi_finalize, get_current_time, &
+                    get_end_time, get_time_units, get_var_units, &
+                    get_var_location, get_value, get_value_at_indices, &
+                    set_value_at_indices
+  use BmiTestUtils, only: init
   implicit none
   private
   public :: collect_bmi, c_string, f_string
@@ -62,7 +63,7 @@ contains
       return
     end if
 
-    call check(error, bmi_initialize() == BMI_SUCCESS, "initialize")
+    call check(error, init() == BMI_SUCCESS, "initialize")
     if (allocated(error)) return
 
     run: block

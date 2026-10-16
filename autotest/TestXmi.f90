@@ -12,8 +12,9 @@ module TestXmi
   use KindModule, only: DP, I4B
   use ConstantsModule, only: LENMEMADDRESS
   use mf6bmiError, only: BMI_SUCCESS
-  use mf6bmi, only: bmi_initialize, bmi_finalize, get_current_time, &
-                    get_time_step, get_value_at_indices
+  use mf6bmi, only: bmi_finalize, get_current_time, get_time_step, &
+                    get_value_at_indices
+  use BmiTestUtils, only: init
   use mf6xmi, only: xmi_get_version, get_var_address, &
                     xmi_get_subcomponent_count, xmi_prepare_time_step, &
                     xmi_prepare_solve, xmi_solve, xmi_finalize_solve, &
@@ -50,7 +51,7 @@ contains
       return
     end if
 
-    call check(error, bmi_initialize() == BMI_SUCCESS, "initialize")
+    call check(error, init() == BMI_SUCCESS, "initialize")
     if (allocated(error)) return
 
     run: block

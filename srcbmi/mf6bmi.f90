@@ -23,7 +23,7 @@ module mf6bmi
   use iso_c_binding, only: c_int, c_char, c_double, C_NULL_CHAR, c_loc, c_ptr, &
                            c_f_pointer
   use KindModule, only: DP, I4B, LGP
-  use ConstantsModule, only: LENMEMPATH, LENVARNAME
+  use ConstantsModule, only: LENMEMPATH, LENVARNAME, LINELENGTH
   use CharacterStringModule
   use MemoryManagerModule, only: mem_setptr, get_mem_elem_size, get_isize, &
                                  get_mem_rank, get_mem_shape, get_mem_type, &
@@ -72,21 +72,41 @@ contains
 
   end function bmi_get_bmi_version
 
-  !> @brief Initialize the computational core
+  !> @brief Initialize the computational core and negotiate extensions
   !!
-  !! It is required to have the MODFLOW 6 configuration file 'mfsim.nam'
-  !! available in the current working directory when calling this routine.
+  !! An empty @p c_config reads 'mfsim.nam' in the current working directory;
+  !! otherwise it is the path to the simulation name file. The extension
+  !! name lists are flat buffers with stride BMI_LENEXTENSIONNAME, and
+  !! @p c_supported must hold at least @p n_requested names.
   !!
   !! NOTE: initialization should always be matched with a call to
   !! bmi_finalize(). However, we currently do not support the reinitialization
   !! of a model in the same memory space... You would have to create a new
   !! process for that.
   !<
-  function bmi_initialize() result(bmi_status) bind(C, name="initialize")
+  function bmi_initialize(c_config, n_requested, c_requested, n_supported, &
+                          c_supported) result(bmi_status) &
+    bind(C, name="initialize")
     !DIR$ ATTRIBUTES DLLEXPORT :: bmi_initialize
+    ! -- modules
+    use SimVariablesModule, only: simfile
     ! -- dummy variables
+    character(kind=c_char), intent(in) :: c_config(*) !< simulation name file, or empty
+    integer(kind=c_int), intent(in) :: n_requested !< number of requested extensions
+    character(kind=c_char), intent(in) :: c_requested(*) !< requested extension names
+    integer(kind=c_int), intent(out) :: n_supported !< number of supported extensions
+    character(kind=c_char), intent(inout) :: c_supported(*) !< supported extension names
     integer(kind=c_int) :: bmi_status !< BMI status code
     ! -- local variables
+    integer(I4B) :: config_len
+
+    call negotiate_extensions(n_requested, c_requested, n_supported, &
+                              c_supported)
+
+    config_len = strlen(c_config, LINELENGTH + 1)
+    if (config_len > 0) then
+      simfile = char_array_to_string(c_config, config_len)
+    end if
 
     if (istdout_to_file > 0) then
       ! -- open stdout file mfsim.stdout
@@ -180,6 +200,7 @@ contains
     ! we don't want a full stop() here, this disables it:
     iforcestop = 0
     call Mf6Finalize()
+    xmi_enabled = .false.
 
     bmi_status = BMI_SUCCESS
 

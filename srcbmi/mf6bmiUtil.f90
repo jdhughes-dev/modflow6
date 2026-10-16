@@ -55,7 +55,64 @@ module mf6bmiUtil
   integer(c_int), bind(C, name="BMI_LENSETNAME") :: BMI_LENSETNAME = 256 !< max. length for variable set name C-strings
   !DIR$ ATTRIBUTES DLLEXPORT :: BMI_LENSETNAME
 
+  integer(c_int), bind(C, name="BMI_LENEXTENSIONNAME") :: &
+    BMI_LENEXTENSIONNAME = 256 !< max. length for extension name C-strings
+  !DIR$ ATTRIBUTES DLLEXPORT :: BMI_LENEXTENSIONNAME
+
+  character(len=*), parameter :: EXT_XMI = 'xmi' !< name of the XMI extension
+  logical(LGP) :: xmi_enabled = .false. !< true when xmi was negotiated at initialize
+
 contains
+
+  !> @brief Enable the requested extensions that are supported
+  !!
+  !! Both name lists are flat buffers with stride BMI_LENEXTENSIONNAME;
+  !! @p c_supported must hold at least @p n_requested names.
+  !<
+  subroutine negotiate_extensions(n_requested, c_requested, n_supported, &
+                                  c_supported)
+    ! -- dummy variables
+    integer(c_int), intent(in) :: n_requested !< number of requested extensions
+    character(kind=c_char), intent(in) :: c_requested(*) !< requested extension names
+    integer(c_int), intent(out) :: n_supported !< number of supported extensions
+    character(kind=c_char), intent(inout) :: c_supported(*) !< supported extension names
+    ! -- local variables
+    character(len=:), allocatable :: extension_name
+    integer(I4B) :: i, istart, iend
+
+    xmi_enabled = .false.
+    n_supported = 0
+    do i = 1, n_requested
+      istart = (i - 1) * BMI_LENEXTENSIONNAME + 1
+      iend = i * BMI_LENEXTENSIONNAME
+      extension_name = &
+        char_array_to_string(c_requested(istart:iend), &
+                             strlen(c_requested(istart:iend), &
+                                    BMI_LENEXTENSIONNAME))
+      select case (extension_name)
+      case (EXT_XMI)
+        if (.not. xmi_enabled) then
+          xmi_enabled = .true.
+          call add_name(EXT_XMI)
+        end if
+      end select
+    end do
+
+  contains
+
+    subroutine add_name(name)
+      character(len=*), intent(in) :: name
+      integer(I4B) :: j, offset
+
+      offset = n_supported * BMI_LENEXTENSIONNAME
+      do j = 1, len(name)
+        c_supported(offset + j) = name(j:j)
+      end do
+      c_supported(offset + len(name) + 1) = c_null_char
+      n_supported = n_supported + 1
+    end subroutine add_name
+
+  end subroutine negotiate_extensions
 
   !> @brief Split the variable address string
   !!
