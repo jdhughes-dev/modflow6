@@ -1,0 +1,93 @@
+name: BMI 3 prototype
+
+# Tests the bmi-3 branch on the jdhughes-dev fork only: the MF6 unit tests,
+# including the BMI suites, the libmf6 API tests, and the MODFLOW 6 examples,
+# with bmipy, xmipy, and modflowapi from the bmi-3 branches of the forks.
+on:
+  push:
+    branches:
+      - bmi-3
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    if: github.repository_owner == 'jdhughes-dev'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    env:
+      FC: gfortran
+      FC_V: 13
+    steps:
+      - name: Checkout MF6
+        uses: actions/checkout@v7
+
+      - name: Setup ${{ env.FC }} ${{ env.FC_V }}
+        uses: fortran-lang/setup-fortran@v1
+        with:
+          compiler: gcc
+          version: ${{ env.FC_V }}
+
+      - name: Setup pixi
+        uses: prefix-dev/setup-pixi@v0.11.0
+        with:
+          pixi-version: v0.80.0
+
+      - name: Build MF6, libmf6, and mf5to6
+        run: |
+          pixi run setup builddir
+          pixi run build builddir
+          pixi run setup-mf5to6 builddir
+          pixi run build-mf5to6 builddir
+
+      - name: Show build log
+        if: failure()
+        run: cat builddir/meson-logs/meson-log.txt
+
+      - name: Unit test MF6, including the BMI suites
+        run: pixi run test builddir
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install the BMI 3 Python stack
+        run: |
+          python -m pip install --upgrade pip
+          # modflowapi pulls xmipy, and xmipy pulls bmipy, from the forks
+          pip install "modflowapi @ git+https://github.com/jdhughes-dev/modflowapi@bmi-3"
+          pip install flopy "modflow-devtools[dfn,models]>=1.9.1,<2" pytest \
+            pytest-xdist pytest-dotenv pytest-benchmark "syrupy<5" filelock \
+            networkx jinja2
+          pip list | grep -iE "^(bmipy|xmipy|modflowapi|flopy) "
+
+      - name: Test the libmf6 API
+        working-directory: autotest
+        run: |
+          pytest -v -n auto \
+            test_libmf6_api.py test_libmf6_strings.py \
+            test_gwf_libmf6_evt01.py test_gwf_libmf6_ghb01.py \
+            test_gwf_libmf6_ifmod01.py test_gwf_libmf6_ifmod02.py \
+            test_gwf_libmf6_ifmod03.py test_gwf_libmf6_rch01.py \
+            test_gwf_libmf6_rch02.py test_gwf_libmf6_rdrn.py \
+            test_gwf_libmf6_riv01.py test_gwf_libmf6_riv02.py \
+            test_gwf_libmf6_sto01.py test_gwf_tdis.py \
+            test_gwf_xt3d_newton_upstream.py test_prt_libmf6_budget.py
+
+      - name: Run the MODFLOW 6 examples through modflowapi
+        run: |
+          curl -sSfL -o mf6examples.zip \
+            https://github.com/MODFLOW-ORG/modflow6-examples/releases/download/current/mf6examples.zip
+          unzip -q mf6examples.zip -d examples
+          python .github/bmi3/run_examples.py examples bin/libmf6.*
