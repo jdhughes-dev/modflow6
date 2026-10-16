@@ -34,6 +34,10 @@ module mf6bmiExtension
   end type XmiTableType
 
   !> @brief Function table for the 'bmi:pointers' extension
+  !!
+  !! A 'bmi:pointers:transient' variable moves only in prepare_time_step, and
+  !! PRT committed particles also in finalize_time_step, so fetch it again
+  !! after prepare_time_step (or update).
   !<
   type, bind(C) :: PointersTableType
     integer(c_int) :: version !< table version
